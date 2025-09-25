@@ -1,72 +1,118 @@
-# 📦 PyGlass Stock  
-
-Sistema de gestión de inventario y compras para una vidriería, desarrollado como parte del curso **Procesos de Software - GRUPO 03** en la **UNMSM – FISI**.  
+Perfecto 🙌 Te lo dejo mejorado, con más estructura y estilo tipo **README profesional de GitHub**, manteniendo lo que ya tienes pero más claro, con secciones útiles para cualquier persona que abra tu repo:
 
 ---
 
-## 📌 Descripción  
-El sistema PyGlass Stock permite controlar de manera eficiente las operaciones de una vidriería, asegurando consistencia en inventario y trazabilidad en las compras.  
+# 📦 PyGlass Stock
 
-### Entidades principales  
-- **Proveedores**: encargados de abastecer materiales.  
-- **Productos**: artículos terminados en inventario.  
-- **Materiales**: materias primas utilizadas en producción o venta.  
-- **Usuarios**: responsables de registrar operaciones.  
-- **Órdenes de compra**: registros de adquisiciones.  
-- **Kardex**: historial de movimientos de inventario.  
-
-### Relaciones clave  
-- Un proveedor abastece muchos materiales.  
-- Un usuario puede registrar varias órdenes de compra.  
-- Una orden de compra está asociada a un material, proveedor y usuario.  
-- Kardex vincula movimientos de materiales con órdenes de compra.  
-- Productos y materiales mantienen control de stock independiente.  
+Sistema de **gestión de inventario y compras** para una vidriería, desarrollado como parte del curso **Procesos de Software – GRUPO 03 (UNMSM – FISI)**.
 
 ---
 
-## 🏛️ Decisiones de diseño – Arquitectura  
-Se implementa una **arquitectura en 3 capas** (Presentación – Lógica de Negocio – Datos):  
-- **Frontend (Presentación)**: React, interfaz gráfica de usuario.  
-- **Backend (Negocio)**: Python + FastAPI, lógica de inventario y reglas de negocio.  
-- **Base de Datos (Datos)**: MySQL (Clever Cloud) con SQLAlchemy como ORM.  
+## ✨ Características principales
 
-**Justificación**:  
-- Mantiene separación de responsabilidades.  
-- Escalable y flexible ante cambios tecnológicos.  
-- Facilita pruebas y despliegue modular.  
-- Sigue el patrón MVC, coherente con la teoría del curso.  
+* 📊 **Control de inventario** de materiales y productos.
+* 🛒 **Gestión de órdenes de compra** y proveedores.
+* 👤 **Módulo de usuarios** con autenticación.
+* 📑 **Kardex automatizado** para trazabilidad de movimientos.
+* 🌐 **Arquitectura web fullstack** con frontend y backend desacoplados.
 
 ---
 
-## ⚙️ Lenguaje y Frameworks  
-- **Lenguaje principal**: Python  
-- **Backend**: FastAPI  
-- **Frontend**: React + TailwindCSS  
-- **Base de datos**: MySQL (Clever Cloud)  
-- **ORM**: SQLAlchemy  
+## 🏗️ Arquitectura del sistema
+
+El proyecto sigue una **arquitectura en 3 capas**:
+
+* **Frontend (Presentación)**: React → interfaz de usuario moderna y responsiva.
+* **Backend (Negocio)**: FastAPI (Python) → gestiona lógica de inventario, reglas y validaciones.
+* **Base de datos (Datos)**: MySQL (Clever Cloud / Docker) → persistencia con SQLAlchemy ORM.
+
+🔹 **Ventajas**: separación de responsabilidades, escalabilidad, modularidad, fácil despliegue y pruebas.
 
 ---
 
-## 🧾 Justificación  
+## 📂 Entidades y relaciones principales
 
-### 📚 Curva de aprendizaje  
-- Python: sintaxis clara y sencilla.  
-- FastAPI: rápido, intuitivo y con validación automática.  
-- React: librería popular, fácil de aprender con gran cantidad de recursos.  
+* **Proveedores** → abastecen múltiples materiales.
+* **Materiales** → insumos base con control de stock.
+* **Productos** → artículos terminados independientes de materiales.
+* **Usuarios** → responsables de registrar operaciones.
+* **Órdenes de compra** → vinculadas a usuario, proveedor y materiales.
+* **Kardex** → registra entradas y salidas de inventario.
 
-### 🌍 Comunidad  
-- Python y React tienen comunidades globales muy activas.  
-- FastAPI crece rápidamente y ya es usado en proyectos empresariales.  
+---
 
-### 🔗 Compatibilidad con requisitos  
-- FastAPI + SQLAlchemy se integra fácilmente con MySQL para inventario y kardex.  
-- React permite interfaces dinámicas, necesarias para registros y consultas.  
-- Comunicación modular vía **APIs REST**.  
+## ⚙️ Tecnologías utilizadas
 
-### 🧪 Facilidad de pruebas  
-- FastAPI soporta **Pytest** y validación de datos.  
-- React cuenta con **React Testing Library** para pruebas de UI.  
+* **Lenguaje**: Python 3.11+
+* **Backend**: FastAPI
+* **Frontend**: React + TailwindCSS
+* **Base de datos**: MySQL
+* **ORM**: SQLAlchemy
+* **Herramientas**: Docker + Docker Compose
+* **Despliegue**: Render (Backend), Clever Cloud (DB), Render (Frontend)
 
-### 🚀 Facilidad de despliegue  
-- Stack compatible con Render, Clever Cloud y Docker.  
-- CI/CD posible con GitHub Actions.  
+---
+
+## 📚 Justificación tecnológica
+
+### Curva de aprendizaje 📘
+
+* **Python + FastAPI** → sintaxis clara, validación automática, API REST rápida.
+* **React** → librería popular, gran documentación y ecosistema de UI.
+
+### Comunidad 🌍
+
+* Python y React tienen comunidades globales y activas.
+* FastAPI crece rápidamente y es adoptado en proyectos empresariales.
+
+### Compatibilidad 🔗
+
+* SQLAlchemy se integra de forma nativa con MySQL.
+* React permite interfaces dinámicas y modulares.
+* Comunicación a través de **APIs REST JSON**.
+
+### Facilidad de pruebas 🧪
+
+* FastAPI soporta **Pytest** + validación de esquemas.
+* React con **React Testing Library** y Jest para UI.
+
+### Despliegue 🚀
+
+* Infraestructura **cloud-friendly**: Render, Clever Cloud y Docker.
+* Compatible con CI/CD en GitHub Actions.
+
+---
+
+## 🐳 Despliegue con Docker
+
+El proyecto incluye **docker-compose.yml** para levantar el sistema completo:
+
+```bash
+git clone https://github.com/usuario/pyglass_stock.git
+cd pyglass_stock
+docker compose up -d
+```
+
+Esto levanta:
+
+* `pyglass-frontend` → React (puerto 5173)
+* `pyglass-backend` → FastAPI (puerto 8000)
+* `pyglass-db` → MySQL (puerto 3307)
+
+✅ Portátil y reproducible en cualquier entorno con Docker.
+
+---
+
+## 📖 Uso
+
+* Accede al **frontend** en: `http://localhost:5173`
+* Accede al **backend** (API docs Swagger): `http://localhost:8000/docs`
+
+---
+
+## 👨‍💻 Autores
+
+📌 Proyecto desarrollado por **Grupo 03 – Procesos de Software (UNMSM – FISI)**.
+
+---
+
