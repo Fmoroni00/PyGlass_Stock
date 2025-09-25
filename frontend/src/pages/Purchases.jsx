@@ -1,12 +1,18 @@
 import React, { useState, useEffect } from "react";
 
 // Inlined API logic to make the file self-contained
-let token = localStorage.getItem("token");
+const getToken = () => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem("token");
+  }
+  return null;
+};
 
 const getHeaders = () => {
   const headers = {
     "Content-Type": "application/json",
   };
+  const token = getToken();
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
@@ -15,8 +21,30 @@ const getHeaders = () => {
 
 const handleResponse = async (response) => {
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || "Error en la petición");
+    let errorMessage = "Error en la petición";
+    try {
+      const error = await response.json();
+      console.log("Error response:", error); // Para debugging
+
+      if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error.detail) {
+        if (typeof error.detail === 'string') {
+          errorMessage = error.detail;
+        } else if (Array.isArray(error.detail)) {
+          errorMessage = error.detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ');
+        } else {
+          errorMessage = JSON.stringify(error.detail);
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      } else {
+        errorMessage = JSON.stringify(error);
+      }
+    } catch (e) {
+      errorMessage = `Error ${response.status}: ${response.statusText}`;
+    }
+    throw new Error(errorMessage);
   }
   return response.json();
 };
@@ -45,12 +73,26 @@ const api = {
       headers: getHeaders(),
     }).then(handleResponse);
   },
+  getSuppliers: () => {
+    return fetch("http://127.0.0.1:8000/suppliers/", {
+      headers: getHeaders(),
+    }).then(handleResponse);
+  },
+ getMaterialSuppliers: (materialId) => {
+  return fetch(`http://127.0.0.1:8000/suppliers/by-material/${materialId}`, {
+    headers: getHeaders(),
+  }).then(handleResponse);
+},
 };
 
 const Purchases = () => {
   const [materials, setMaterials] = useState([]);
   const [selectedMaterial, setSelectedMaterial] = useState("");
-  const [quantity, setQuantity] = useState(0);
+  const [selectedMaterialData, setSelectedMaterialData] = useState(null);
+  const [availableSuppliers, setAvailableSuppliers] = useState([]);
+  const [selectedSupplier, setSelectedSupplier] = useState("");
+  const [selectedSupplierData, setSelectedSupplierData] = useState(null);
+  const [quantity, setQuantity] = useState("");
   const [orders, setOrders] = useState([]);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -58,18 +100,36 @@ const Purchases = () => {
   const fetchMaterials = async () => {
     try {
       const data = await api.getMaterials();
-      setMaterials(data);
+      setMaterials(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError("Error al cargar los materiales.");
+      console.error("Error fetching materials:", err);
+      setError("Error al cargar los materiales: " + err.message);
     }
   };
 
   const fetchOrders = async () => {
     try {
       const data = await api.getOrders();
-      setOrders(data);
+      setOrders(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError("Error al cargar las órdenes de compra.");
+      console.error("Error fetching orders:", err);
+      setError("Error al cargar las órdenes de compra: " + err.message);
+    }
+  };
+
+  const fetchMaterialSuppliers = async (materialId) => {
+    try {
+      const data = await api.getMaterialSuppliers(materialId);
+      setAvailableSuppliers(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Error fetching material suppliers:", err);
+      // Si no hay endpoint específico, cargar todos los suppliers
+      try {
+        const allSuppliers = await api.getSuppliers();
+        setAvailableSuppliers(Array.isArray(allSuppliers) ? allSuppliers : []);
+      } catch (fallbackErr) {
+        setError("Error al cargar los proveedores: " + err.message);
+      }
     }
   };
 
@@ -78,42 +138,119 @@ const Purchases = () => {
     fetchOrders();
   }, []);
 
+  const handleMaterialChange = async (materialId) => {
+    setSelectedMaterial(materialId);
+    setSelectedSupplier("");
+    setSelectedSupplierData(null);
+    setAvailableSuppliers([]);
+
+    if (materialId) {
+      // Buscar los datos del material seleccionado
+      const material = materials.find(m => m.id === parseInt(materialId));
+      setSelectedMaterialData(material);
+
+      // Cargar proveedores disponibles para este material
+      await fetchMaterialSuppliers(materialId);
+    } else {
+      setSelectedMaterialData(null);
+    }
+  };
+
+  const handleSupplierChange = (supplierId) => {
+    setSelectedSupplier(supplierId);
+
+    if (supplierId) {
+      // Buscar los datos del proveedor seleccionado
+      const supplier = availableSuppliers.find(s => s.id === parseInt(supplierId));
+      setSelectedSupplierData(supplier);
+    } else {
+      setSelectedSupplierData(null);
+    }
+  };
+
   const handleCreateOrder = async (e) => {
     e.preventDefault();
     setError("");
     setSuccess("");
 
-    if (!selectedMaterial || quantity <= 0) {
-      setError("Por favor, selecciona un material y especifica una cantidad mayor a 0.");
+    // Validaciones
+    if (!selectedMaterial) {
+      setError("Por favor, selecciona un material.");
       return;
     }
 
-    const [materialId, supplierName] = selectedMaterial.split('|');
+    if (!selectedSupplier) {
+      setError("Por favor, selecciona un proveedor.");
+      return;
+    }
 
-    const orderData = {
-      supplier_name: supplierName,
-      material_id: parseInt(materialId),
-      quantity: quantity,
-    };
+    const quantityNum = parseInt(quantity);
+    if (!quantity || quantityNum <= 0 || isNaN(quantityNum)) {
+      setError("Por favor, especifica una cantidad válida mayor a 0.");
+      return;
+    }
 
     try {
-      await api.createOrder(orderData);
+      if (!selectedSupplierData) {
+        setError("Datos del proveedor no encontrados.");
+        return;
+      }
+
+      const orderData = {
+        supplier_id: parseInt(selectedSupplier), // Cambio: enviar supplier_id en lugar de supplier_name
+        material_id: parseInt(selectedMaterial),
+        quantity: quantityNum,
+      };
+
+      console.log("Enviando orden:", orderData);
+      const result = await api.createOrder(orderData);
+      console.log("Orden creada:", result);
+
       setSuccess("Orden de compra creada exitosamente.");
-      fetchOrders();
+
+      // Limpiar formulario
+      setSelectedMaterial("");
+      setSelectedMaterialData(null);
+      setSelectedSupplier("");
+      setSelectedSupplierData(null);
+      setAvailableSuppliers([]);
+      setQuantity("");
+
+      // Recargar órdenes
+      await fetchOrders();
     } catch (err) {
-      setError("Error al crear la orden. " + err.message);
+      console.error("Error creating order:", err);
+      console.error("Error details:", {
+        message: err.message,
+        stack: err.stack,
+        name: err.name
+      });
+
+      let errorMsg = "Error desconocido";
+      if (err instanceof Error) {
+        errorMsg = err.message;
+      } else if (typeof err === 'string') {
+        errorMsg = err;
+      } else {
+        errorMsg = JSON.stringify(err);
+      }
+
+      setError("Error al crear la orden: " + errorMsg);
     }
   };
 
   const handleCompleteOrder = async (orderId) => {
     setError("");
     setSuccess("");
+
     try {
+      console.log("Completando orden:", orderId);
       await api.completeOrder(orderId);
       setSuccess("Orden de compra completada y stock actualizado.");
-      fetchOrders(); // Recargar la lista para ver el cambio de estado
+      await fetchOrders();
     } catch (err) {
-      setError("Error al completar la orden. " + err.message);
+      console.error("Error completing order:", err);
+      setError("Error al completar la orden: " + err.message);
     }
   };
 
@@ -137,6 +274,9 @@ const Purchases = () => {
             --yellow-text: #92400e;
             --green-bg: #d1fae5;
             --green-text: #065f46;
+            --info-bg: #dbeafe;
+            --info-text: #1e40af;
+            --info-border: #3b82f6;
           }
 
           @media (prefers-color-scheme: dark) {
@@ -154,6 +294,9 @@ const Purchases = () => {
               --yellow-text: #fde68a;
               --green-bg: #065f46;
               --green-text: #a7f3d0;
+              --info-bg: #1e3a8a;
+              --info-text: #93c5fd;
+              --info-border: #3b82f6;
             }
           }
 
@@ -205,6 +348,26 @@ const Purchases = () => {
             color: var(--success-text);
           }
 
+          .info-panel {
+            background-color: var(--info-bg);
+            border: 1px solid var(--info-border);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+          }
+
+          .info-title {
+            font-weight: 600;
+            color: var(--info-text);
+            margin-bottom: 0.5rem;
+          }
+
+          .info-content {
+            color: var(--info-text);
+            font-size: 0.875rem;
+            line-height: 1.5;
+          }
+
           .form-group {
             margin-bottom: 1rem;
           }
@@ -213,6 +376,7 @@ const Purchases = () => {
             display: block;
             color: var(--text-color);
             margin-bottom: 0.25rem;
+            font-weight: 500;
           }
 
           .form-input, .form-select {
@@ -226,6 +390,12 @@ const Purchases = () => {
             color: var(--text-color);
           }
 
+          .form-select:focus, .form-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+          }
+
           .button {
             width: 100%;
             background-color: var(--primary-color);
@@ -235,10 +405,16 @@ const Purchases = () => {
             border: none;
             cursor: pointer;
             transition: background-color 0.2s;
+            font-weight: 500;
           }
 
           .button:hover {
             background-color: var(--primary-hover-color);
+          }
+
+          .button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
           }
 
           .table-container {
@@ -316,36 +492,109 @@ const Purchases = () => {
 
           <form onSubmit={handleCreateOrder}>
             <div className="form-group">
-              <label htmlFor="material-select" className="form-label">Seleccionar Material</label>
+              <label htmlFor="material-select" className="form-label">1. Seleccionar Material/Producto</label>
               <select
                 id="material-select"
                 value={selectedMaterial}
-                onChange={(e) => setSelectedMaterial(e.target.value)}
+                onChange={(e) => handleMaterialChange(e.target.value)}
                 className="form-select"
               >
                 <option value="">-- Selecciona un material --</option>
                 {materials.map((material) => (
-                  <option key={material.id} value={`${material.id}|${material.supplier_name}`}>
-                    {material.name} (ID: {material.id}) - Proveedor: {material.supplier_name}
+                  <option key={material.id} value={material.id}>
+                    {material.name} (ID: {material.id}) - Stock: {material.stock}
                   </option>
                 ))}
               </select>
             </div>
+
+            {selectedMaterialData && (
+              <div className="info-panel">
+                <div className="info-title">Material Seleccionado</div>
+                <div className="info-content">
+                  <strong>Nombre:</strong> {selectedMaterialData.name}<br/>
+                  <strong>Stock actual:</strong> {selectedMaterialData.stock} unidades<br/>
+                  {selectedMaterialData.description && (
+                    <>
+                      <strong>Descripción:</strong> {selectedMaterialData.description}<br/>
+                    </>
+                  )}
+                  {selectedMaterialData.unit && (
+                    <>
+                      <strong>Unidad:</strong> {selectedMaterialData.unit}
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="form-group">
-              <label htmlFor="quantity-input" className="form-label">Cantidad</label>
+              <label htmlFor="supplier-select" className="form-label">2. Seleccionar Proveedor</label>
+              <select
+                id="supplier-select"
+                value={selectedSupplier}
+                onChange={(e) => handleSupplierChange(e.target.value)}
+                className="form-select"
+                disabled={!selectedMaterial}
+              >
+                <option value="">-- Selecciona un proveedor --</option>
+                {availableSuppliers.map((supplier) => (
+                  <option key={supplier.id} value={supplier.id}>
+                    {supplier.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {selectedSupplierData && (
+              <div className="info-panel">
+                <div className="info-title">Proveedor Seleccionado</div>
+                <div className="info-content">
+                  <strong>Nombre:</strong> {selectedSupplierData.name}<br/>
+                  {selectedSupplierData.contact_person && (
+                    <>
+                      <strong>Contacto:</strong> {selectedSupplierData.contact_person}<br/>
+                    </>
+                  )}
+                  {selectedSupplierData.phone && (
+                    <>
+                      <strong>Teléfono:</strong> {selectedSupplierData.phone}<br/>
+                    </>
+                  )}
+                  {selectedSupplierData.email && (
+                    <>
+                      <strong>Email:</strong> {selectedSupplierData.email}<br/>
+                    </>
+                  )}
+                  {selectedSupplierData.address && (
+                    <>
+                      <strong>Dirección:</strong> {selectedSupplierData.address}
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="form-group">
+              <label htmlFor="quantity-input" className="form-label">3. Cantidad</label>
               <input
                 id="quantity-input"
                 type="number"
+                min="1"
                 value={quantity}
-                onChange={(e) => setQuantity(Number(e.target.value))}
+                onChange={(e) => setQuantity(e.target.value)}
                 className="form-input"
+                placeholder="Ingresa la cantidad"
+                disabled={!selectedSupplier}
               />
             </div>
+
             <button
               type="submit"
               className="button"
+              disabled={!selectedMaterial || !selectedSupplier || !quantity}
             >
-              Crear Orden
+              Crear Orden de Compra
             </button>
           </form>
         </div>
@@ -360,7 +609,7 @@ const Purchases = () => {
                   <th>ID</th>
                   <th>Fecha</th>
                   <th>Proveedor</th>
-                  <th>ID Material</th>
+                  <th>Material</th>
                   <th>Cantidad</th>
                   <th>Estado</th>
                   <th>Acciones</th>
@@ -368,31 +617,36 @@ const Purchases = () => {
               </thead>
               <tbody>
                 {orders.length > 0 ? (
-                  orders.map((order) => (
-                    <tr key={order.id}>
-                      <td>{order.id}</td>
-                      <td>{new Date(order.date).toLocaleDateString()}</td>
-                      <td>{order.supplier_name}</td>
-                      <td>{order.material_id}</td>
-                      <td>{order.quantity}</td>
-                      <td>
-                        <span className={`status-badge ${order.status}`}>
-                          {order.status}
-                        </span>
-                      </td>
-                      <td>
-                        {order.status === 'pendiente' && (
-                          <button
-                            onClick={() => handleCompleteOrder(order.id)}
-                            className="action-button"
-                            title="Marcar como realizada"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-check-circle"><path d="M22 11.08V12a10 10 0 1 1-5.93-8.8"/><path d="M22 4L12 14.01l-3-3"/></svg>
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))
+                  orders.map((order) => {
+                    const material = materials.find(m => m.id === order.material_id);
+                    return (
+                      <tr key={order.id}>
+                        <td>{order.id}</td>
+                        <td>{new Date(order.date).toLocaleDateString()}</td>
+                        <td>{order.supplier_name}</td>
+                        <td>
+                          {material ? material.name : `ID: ${order.material_id}`}
+                        </td>
+                        <td>{order.quantity}</td>
+                        <td>
+                          <span className={`status-badge ${order.status}`}>
+                            {order.status}
+                          </span>
+                        </td>
+                        <td>
+                          {order.status === 'pendiente' && (
+                            <button
+                              onClick={() => handleCompleteOrder(order.id)}
+                              className="action-button"
+                              title="Marcar como realizada"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-check-circle"><path d="M22 11.08V12a10 10 0 1 1-5.93-8.8"/><path d="M22 4L12 14.01l-3-3"/></svg>
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
                 ) : (
                   <tr>
                     <td colSpan="7" style={{ textAlign: "center", color: "#6b7280" }}>

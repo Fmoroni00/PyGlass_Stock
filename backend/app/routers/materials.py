@@ -17,7 +17,21 @@ def get_materials(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    return db.query(models.Material).all()
+    materials = db.query(models.Material).all()
+    return materials
+
+
+# Obtener una materia prima por ID con sus proveedores
+@router.get("/{material_id}", response_model=schemas.MaterialOut)
+def get_material(
+    material_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    material = db.query(models.Material).filter(models.Material.id == material_id).first()
+    if not material:
+        raise HTTPException(status_code=404, detail="Material no encontrado")
+    return material
 
 
 # Crear materia prima
@@ -46,11 +60,29 @@ def update_material(
     if not material:
         raise HTTPException(status_code=404, detail="Material no encontrado")
 
+    old_stock = material.stock
+
     for key, value in update.dict(exclude_unset=True).items():
         setattr(material, key, value)
 
     db.commit()
     db.refresh(material)
+
+    # Registrar en Kardex si cambió el stock
+    if "stock" in update.dict(exclude_unset=True) and material.stock != old_stock:
+        movement_type = "entrada" if material.stock > old_stock else "salida"
+        kardex = models.Kardex(
+            movement_type=movement_type,
+            quantity=abs(material.stock - old_stock),
+            stock_anterior=old_stock,
+            stock_nuevo=material.stock,
+            observaciones="Actualización manual de stock",
+            material_id=material.id,
+            user_id=current_user.id,
+        )
+        db.add(kardex)
+        db.commit()
+
     return material
 
 
@@ -66,9 +98,24 @@ def add_material(
     if not material:
         raise HTTPException(status_code=404, detail="Material no encontrado")
 
+    old_stock = material.stock
     material.stock += quantity
     db.commit()
     db.refresh(material)
+
+    # Kardex entrada
+    kardex = models.Kardex(
+        movement_type="entrada",
+        quantity=quantity,
+        stock_anterior=old_stock,
+        stock_nuevo=material.stock,
+        observaciones="Ingreso manual de stock",
+        material_id=material.id,
+        user_id=current_user.id,
+    )
+    db.add(kardex)
+    db.commit()
+
     return material
 
 
@@ -87,7 +134,53 @@ def remove_material(
     if material.stock < quantity:
         raise HTTPException(status_code=400, detail="Stock insuficiente")
 
+    old_stock = material.stock
     material.stock -= quantity
     db.commit()
     db.refresh(material)
+
+    # Kardex salida
+    kardex = models.Kardex(
+        movement_type="salida",
+        quantity=quantity,
+        stock_anterior=old_stock,
+        stock_nuevo=material.stock,
+        observaciones="Salida manual de stock",
+        material_id=material.id,
+        user_id=current_user.id,
+    )
+    db.add(kardex)
+    db.commit()
+
     return material
+
+
+# Agregar este endpoint a tu archivo app/routers/materials.py existente
+
+@router.get("/{material_id}/suppliers", response_model=List[schemas.SupplierOut])
+def get_suppliers_for_material(
+        material_id: int,
+        db: Session = Depends(get_db),
+        current_user: models.User = Depends(get_current_user)
+):
+    """
+    Obtiene los proveedores disponibles para un material específico.
+    Si el material tiene un supplier_id específico, devuelve solo ese proveedor.
+    Si no, devuelve todos los proveedores disponibles.
+    """
+    # Verificar que el material existe
+    material = db.query(models.Material).filter(models.Material.id == material_id).first()
+    if not material:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Material no encontrado")
+
+    # Si el material tiene un proveedor específico asignado, devolverlo
+    if material.supplier_id:
+        supplier = db.query(models.Supplier).filter(models.Supplier.id == material.supplier_id).first()
+        if supplier:
+            return [supplier]
+        else:
+            # Si el supplier_id no existe, devolver todos los proveedores
+            return db.query(models.Supplier).all()
+    else:
+        # Si no tiene proveedor específico, devolver todos los proveedores disponibles
+        return db.query(models.Supplier).all()

@@ -46,11 +46,29 @@ def update_product(
     if not product:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
 
+    old_stock = product.stock
+
     for key, value in update.dict(exclude_unset=True).items():
         setattr(product, key, value)
 
     db.commit()
     db.refresh(product)
+
+    # Kardex si se modificó stock
+    if "stock" in update.dict(exclude_unset=True) and product.stock != old_stock:
+        movement_type = "entrada" if product.stock > old_stock else "salida"
+        kardex = models.Kardex(
+            movement_type=movement_type,
+            quantity=abs(product.stock - old_stock),
+            stock_anterior=old_stock,
+            stock_nuevo=product.stock,
+            observaciones="Actualización manual de stock (producto)",
+            product_id=product.id,
+            user_id=current_user.id,
+        )
+        db.add(kardex)
+        db.commit()
+
     return product
 
 
@@ -66,9 +84,24 @@ def add_product(
     if not product:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
 
+    old_stock = product.stock
     product.stock += quantity
     db.commit()
     db.refresh(product)
+
+    # Kardex entrada
+    kardex = models.Kardex(
+        movement_type="entrada",
+        quantity=quantity,
+        stock_anterior=old_stock,
+        stock_nuevo=product.stock,
+        observaciones="Ingreso manual de stock (producto)",
+        product_id=product.id,
+        user_id=current_user.id,
+    )
+    db.add(kardex)
+    db.commit()
+
     return product
 
 
@@ -87,7 +120,22 @@ def remove_product(
     if product.stock < quantity:
         raise HTTPException(status_code=400, detail="Stock insuficiente")
 
+    old_stock = product.stock
     product.stock -= quantity
     db.commit()
     db.refresh(product)
+
+    # Kardex salida
+    kardex = models.Kardex(
+        movement_type="salida",
+        quantity=quantity,
+        stock_anterior=old_stock,
+        stock_nuevo=product.stock,
+        observaciones="Salida manual de stock (producto)",
+        product_id=product.id,
+        user_id=current_user.id,
+    )
+    db.add(kardex)
+    db.commit()
+
     return product
