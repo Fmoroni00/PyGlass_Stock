@@ -17,7 +17,7 @@ origins = [
     "http://localhost",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "https://pyglass-frontend.onrender.com",
+    "https://pyglass-stock-1.onrender.com",
 ]
 
 app.add_middleware(
