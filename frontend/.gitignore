@@ -31,9 +31,7 @@ __pycache__/
 # =========================
 # OS / IDE files
 # =========================
-.vscode/*
-!.vscode/extensions.json
-.idea/
+
 .DS_Store
 *.suo
 *.ntvs*
@@ -46,3 +44,10 @@ __pycache__/
 # =========================
 coverage/
 build/
+
+# =========================
+# OS / IDE files
+# =========================
+.vscode/*
+!.vscode/extensions.json
+.idea/
