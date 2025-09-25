@@ -35,6 +35,8 @@ const handleResponse = async (response) => {
 
 const api = {
   getKardex: () => {
+    // Nota: Es posible que la API necesite un parámetro para filtrar por material/producto si se almacenan por separado.
+    // Asumiremos que la respuesta del backend incluye los campos 'material_name'/'material_id' o 'product_name'/'product_id'.
     return fetch("http://127.0.0.1:8000/kardex/", {
       headers: getHeaders(),
     }).then(handleResponse);
@@ -54,6 +56,7 @@ export default function Cardex() {
     try {
       setIsLoading(true);
       const res = await api.getKardex();
+      // Asegurar que 'res' sea un array. Si el backend devuelve un objeto con la data, ajusta esto.
       setRecords(Array.isArray(res) ? res : []);
       setError(null);
     } catch (err) {
@@ -74,6 +77,43 @@ export default function Cardex() {
       minute: "2-digit",
     });
   };
+
+  // --- Lógica para diferenciar Material/Producto (NUEVO) ---
+
+  const getItemDetails = (record) => {
+    if (record.material_id || record.material_name) {
+      return {
+        name: record.material_name || `Material ID: ${record.material_id}`,
+        type: 'material',
+        id: record.material_id,
+      };
+    }
+    if (record.product_id || record.product_name) {
+      return {
+        name: record.product_name || `Producto ID: ${record.product_id}`,
+        type: 'product',
+        id: record.product_id,
+      };
+    }
+    return {
+      name: 'Ítem Desconocido',
+      type: 'unknown',
+      id: record.id || '-',
+    };
+  };
+
+  const getItemBadgeStyle = (itemType) => {
+      switch (itemType) {
+          case 'material':
+              return styles.itemMaterialBadge;
+          case 'product':
+              return styles.itemProductBadge;
+          default:
+              return styles.movementDefault; // Estilo por defecto si no es ni material ni producto
+      }
+  };
+
+  // --------------------------------------------------------
 
   const getMovementIcon = (movementType) => {
     switch (movementType?.toLowerCase()) {
@@ -202,32 +242,43 @@ export default function Cardex() {
               <div style={styles.headerCell}>Observaciones</div>
             </div>
 
-            {records.map((record, index) => (
-              <div key={record.id || index} style={styles.tableRow} className="tableRow">
-                <div style={styles.cell}>{formatDate(record.date)}</div>
-                <div style={styles.cellName}>
-                  {record.material_name || record.product_name ||
-                   `Material ID: ${record.material_id || record.product_id || '-'}`}
+            {records.map((record, index) => {
+              const itemDetails = getItemDetails(record); // Obtener detalles
+              return (
+                <div key={record.id || index} style={styles.tableRow} className="tableRow">
+                  <div style={styles.cell}>{formatDate(record.date)}</div>
+                  <div style={styles.cellName}>
+                    {/* Renderizado con el tipo de ítem (MODIFICADO) */}
+                    <span
+                      style={{
+                        ...styles.itemBadge,
+                        ...getItemBadgeStyle(itemDetails.type),
+                      }}
+                    >
+                      {itemDetails.type === 'material' ? 'M' : itemDetails.type === 'product' ? 'P' : '?' }
+                    </span>
+                    <span style={{ marginLeft: '8px' }}>{itemDetails.name}</span>
+                  </div>
+                  <div style={styles.cell}>
+                    <span
+                      style={{
+                        ...styles.movementBadge,
+                        ...getMovementStyle(record.movement_type),
+                      }}
+                    >
+                      {getMovementIcon(record.movement_type)} {getMovementLabel(record.movement_type)}
+                    </span>
+                  </div>
+                  <div style={styles.cell}>
+                    {record.quantity > 0 ? `+${record.quantity}` : record.quantity}
+                  </div>
+                  <div style={styles.cell}>{record.stock_anterior || 0}</div>
+                  <div style={styles.cell}>{record.stock_nuevo || 0}</div>
+                  <div style={styles.cell}>{record.username || record.user_id || '-'}</div>
+                  <div style={styles.cell}>{record.observaciones || '-'}</div>
                 </div>
-                <div style={styles.cell}>
-                  <span
-                    style={{
-                      ...styles.movementBadge,
-                      ...getMovementStyle(record.movement_type),
-                    }}
-                  >
-                    {getMovementIcon(record.movement_type)} {getMovementLabel(record.movement_type)}
-                  </span>
-                </div>
-                <div style={styles.cell}>
-                  {record.quantity > 0 ? `+${record.quantity}` : record.quantity}
-                </div>
-                <div style={styles.cell}>{record.stock_anterior || 0}</div>
-                <div style={styles.cell}>{record.stock_nuevo || 0}</div>
-                <div style={styles.cell}>{record.username || record.user_id || '-'}</div>
-                <div style={styles.cell}>{record.observaciones || '-'}</div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -246,6 +297,7 @@ export default function Cardex() {
 }
 
 const styles = {
+  // ... [Estilos anteriores no modificados para ahorrar espacio, excepto 'styles.cellName' y la adición de los nuevos 'styles.item...']
   container: {
     padding: "24px",
     maxWidth: "1400px",
@@ -351,11 +403,31 @@ const styles = {
     alignItems: "center",
     display: "flex",
   },
-  cellName: {
+  cellName: { // MODIFICADO: Agregamos flex para alinear insignia y nombre
     padding: "12px",
     fontWeight: "600",
     color: "#1e293b",
     borderRight: "1px solid #f8fafc",
+    display: 'flex',
+    alignItems: 'center',
+  },
+  // NUEVO: Estilos para la insignia de Material/Producto
+  itemBadge: {
+    padding: "2px 6px",
+    borderRadius: "4px",
+    fontSize: "11px",
+    fontWeight: "700",
+    textTransform: "uppercase",
+    width: '18px', // Para asegurar que el 'M' y 'P' tengan un tamaño similar
+    textAlign: 'center',
+  },
+  itemMaterialBadge: { // Color para Material
+    backgroundColor: "#dbeafe", // blue-100
+    color: "#1e40af", // blue-700
+  },
+  itemProductBadge: { // Color para Producto
+    backgroundColor: "#d1fae5", // green-100
+    color: "#059669", // green-700
   },
   movementBadge: {
     padding: "4px 8px",
