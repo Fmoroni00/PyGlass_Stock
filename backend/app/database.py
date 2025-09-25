@@ -7,16 +7,23 @@ from dotenv import load_dotenv
 # Cargar variables del archivo .env
 load_dotenv()
 
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = os.getenv("DB_PORT", "3306")
-DB_NAME = os.getenv("DB_NAME", "pyglass_stock")
-DB_USER = os.getenv("DB_USER", "root")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "")
+# Variables de Clever Cloud MySQL
+DB_HOST = os.getenv("MYSQL_ADDON_HOST")
+DB_PORT = os.getenv("MYSQL_ADDON_PORT")
+DB_NAME = os.getenv("MYSQL_ADDON_DB")
+DB_USER = os.getenv("MYSQL_ADDON_USER")
+DB_PASSWORD = os.getenv("MYSQL_ADDON_PASSWORD")
 
+# URL de conexión
 DATABASE_URL = f"mysql+mysqldb://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
+# Crear el motor de conexión
 engine = create_engine(DATABASE_URL)
+
+# Sesión
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Base para modelos
 Base = declarative_base()
 
 # Dependencia para inyectar sesión en los endpoints
