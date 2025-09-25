@@ -85,7 +85,7 @@ El proyecto sigue una **arquitectura en 3 capas**:
 El proyecto incluye **docker-compose.yml** para levantar el sistema completo:
 
 ```bash
-git clone https://github.com/usuario/pyglass_stock.git
+git clone https://github.com/Fmoroni00/PyGlass_Stock
 cd pyglass_stock
 docker compose up -d
 ```
