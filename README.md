@@ -42,7 +42,7 @@ El proyecto sigue una **arquitectura en 3 capas**:
 
 * **Lenguaje**: Python 3.11+
 * **Backend**: FastAPI
-* **Frontend**: React 
+* **Frontend**: React
 * **Base de datos**: MySQL
 * **ORM**: SQLAlchemy
 * **Herramientas**: Docker + Docker Compose
