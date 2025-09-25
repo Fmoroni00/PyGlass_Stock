@@ -134,9 +134,16 @@ const Purchases = () => {
   };
 
   useEffect(() => {
-    fetchMaterials();
+  fetchMaterials(); // prioridad
+
+  // Cargar historial en segundo plano después de 2 segundos
+  const timer = setTimeout(() => {
     fetchOrders();
-  }, []);
+  }, 2000);
+
+  return () => clearTimeout(timer);
+}, []);
+
 
   const handleMaterialChange = async (materialId) => {
     setSelectedMaterial(materialId);
