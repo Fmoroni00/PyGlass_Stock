@@ -1,6 +1,3 @@
-Perfecto 🙌 Te lo dejo mejorado, con más estructura y estilo tipo **README profesional de GitHub**, manteniendo lo que ya tienes pero más claro, con secciones útiles para cualquier persona que abra tu repo:
-
----
 
 # 📦 PyGlass Stock
 
