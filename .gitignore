@@ -51,3 +51,6 @@ build/
 .vscode/*
 !.vscode/extensions.json
 .idea/
+# Backend
+/backend/.venv/
+/backend/.env
