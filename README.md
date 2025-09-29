@@ -1,7 +1,8 @@
+---
 
 # 📦 PyGlass Stock
 
-Sistema de **gestión de inventario y compras** para una vidriería, desarrollado como parte del curso **Procesos de Software – GRUPO 03 (UNMSM – FISI)**.
+Sistema de gestión de inventario y compras para una vidriería, desarrollado como parte del curso **Procesos de Software – GRUPO 03 (UNMSM – FISI)**.
 
 ---
 
@@ -9,7 +10,7 @@ Sistema de **gestión de inventario y compras** para una vidriería, desarrollad
 
 * 📊 **Control de inventario** de materiales y productos.
 * 🛒 **Gestión de órdenes de compra** y proveedores.
-* 👤 **Módulo de usuarios** con autenticación.
+* 👤 **Módulo de usuarios con autenticación**.
 * 📑 **Kardex automatizado** para trazabilidad de movimientos.
 * 🌐 **Arquitectura web fullstack** con frontend y backend desacoplados.
 
@@ -19,11 +20,11 @@ Sistema de **gestión de inventario y compras** para una vidriería, desarrollad
 
 El proyecto sigue una **arquitectura en 3 capas**:
 
-* **Frontend (Presentación)**: React → interfaz de usuario moderna y responsiva.
-* **Backend (Negocio)**: FastAPI (Python) → gestiona lógica de inventario, reglas y validaciones.
-* **Base de datos (Datos)**: MySQL (Clever Cloud / Docker) → persistencia con SQLAlchemy ORM.
+* **Frontend (Presentación):** React → interfaz moderna y responsiva.
+* **Backend (Negocio):** FastAPI (Python) → lógica de inventario, reglas y validaciones.
+* **Base de datos (Datos):** MySQL (Clever Cloud / Docker) → persistencia con SQLAlchemy ORM.
 
-🔹 **Ventajas**: separación de responsabilidades, escalabilidad, modularidad, fácil despliegue y pruebas.
+🔹 **Ventajas:** separación de responsabilidades, escalabilidad, modularidad, fácil despliegue y pruebas.
 
 ---
 
@@ -40,61 +41,61 @@ El proyecto sigue una **arquitectura en 3 capas**:
 
 ## ⚙️ Tecnologías utilizadas
 
-* **Lenguaje**: Python 3.11+
-* **Backend**: FastAPI
-* **Frontend**: React + TailwindCSS
-* **Base de datos**: MySQL
-* **ORM**: SQLAlchemy
-* **Herramientas**: Docker + Docker Compose
-* **Despliegue**: Render (Backend), Clever Cloud (DB), Render (Frontend)
+* **Lenguaje:** Python 3.11+
+* **Backend:** FastAPI
+* **Frontend:** React
+* **Base de datos:** MySQL
+* **ORM:** SQLAlchemy
+* **Herramientas:** Docker + Docker Compose
+* **Despliegue:** Render (Backend + Frontend), Clever Cloud (DB)
 
 ---
 
 ## 📚 Justificación tecnológica
 
-### Curva de aprendizaje 📘
+**Curva de aprendizaje 📘**
 
-* **Python + FastAPI** → sintaxis clara, validación automática, API REST rápida.
-* **React** → librería popular, gran documentación y ecosistema de UI.
+* Python + FastAPI → sintaxis clara, validación automática, API REST rápida.
+* React → librería popular, gran documentación y ecosistema de UI.
 
-### Comunidad 🌍
+**Comunidad 🌍**
 
-* Python y React tienen comunidades globales y activas.
-* FastAPI crece rápidamente y es adoptado en proyectos empresariales.
+* Python y React → comunidades globales y activas.
+* FastAPI → en crecimiento y adoptado en proyectos empresariales.
 
-### Compatibilidad 🔗
+**Compatibilidad 🔗**
 
-* SQLAlchemy se integra de forma nativa con MySQL.
-* React permite interfaces dinámicas y modulares.
-* Comunicación a través de **APIs REST JSON**.
+* SQLAlchemy → integración nativa con MySQL.
+* React → interfaces dinámicas y modulares.
+* APIs REST con JSON para comunicación.
 
-### Facilidad de pruebas 🧪
+**Facilidad de pruebas 🧪**
 
-* FastAPI soporta **Pytest** + validación de esquemas.
-* React con **React Testing Library** y Jest para UI.
+* FastAPI → soporte para Pytest y validación de esquemas.
+* React → con React Testing Library y Jest.
 
-### Despliegue 🚀
+**Despliegue 🚀**
 
-* Infraestructura **cloud-friendly**: Render, Clever Cloud y Docker.
+* Infraestructura cloud-friendly: Render + Clever Cloud.
 * Compatible con CI/CD en GitHub Actions.
 
 ---
 
 ## 🐳 Despliegue con Docker
 
-El proyecto incluye **docker-compose.yml** para levantar el sistema completo:
+El proyecto incluye `docker-compose.yml` para levantar el sistema completo:
 
 ```bash
-git clone https://github.com/usuario/pyglass_stock.git
+git clone https://github.com/Fmoroni00/PyGlass_Stock
 cd pyglass_stock
 docker compose up -d
 ```
 
 Esto levanta:
 
-* `pyglass-frontend` → React (puerto 5173)
-* `pyglass-backend` → FastAPI (puerto 8000)
-* `pyglass-db` → MySQL (puerto 3307)
+* **pyglass-frontend →** React (puerto 5173)
+* **pyglass-backend →** FastAPI (puerto 8000)
+* **pyglass-db →** MySQL (puerto 3307)
 
 ✅ Portátil y reproducible en cualquier entorno con Docker.
 
@@ -102,8 +103,15 @@ Esto levanta:
 
 ## 📖 Uso
 
-* Accede al **frontend** en: `http://localhost:5173`
-* Accede al **backend** (API docs Swagger): `http://localhost:8000/docs`
+### 🔹 Local (Docker)
+
+* Frontend → [http://localhost:5173](http://localhost:5173)
+* Backend (Swagger Docs) → [http://localhost:8000/docs](http://localhost:8000/docs)
+
+### 🔹 Despliegue en Render
+
+* 🌐 **Frontend:** [https://pyglass-stock-1.onrender.com](https://pyglass-stock-1.onrender.com)
+* ⚙️ **Backend (API docs):** [https://pyglass-stock.onrender.com/docs](https://pyglass-stock.onrender.com/docs)
 
 ---
 
