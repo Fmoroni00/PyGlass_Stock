@@ -20,8 +20,10 @@ dist-ssr/
 # =========================
 # Python / Backend
 # =========================
-venv/
-.env
+# Carpeta virtual y entorno
+/backend/.venv/
+# Variables de entorno
+/backend/.env
 __pycache__/
 *.pyc
 *.pyo
@@ -31,7 +33,6 @@ __pycache__/
 # =========================
 # OS / IDE files
 # =========================
-
 .DS_Store
 *.suo
 *.ntvs*
@@ -39,18 +40,12 @@ __pycache__/
 *.sln
 *.sw?
 
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
 # =========================
 # Otros opcionales
 # =========================
 coverage/
 build/
-
-# =========================
-# OS / IDE files
-# =========================
-.vscode/*
-!.vscode/extensions.json
-.idea/
-# Backend
-/backend/venv/
-/backend/.env
