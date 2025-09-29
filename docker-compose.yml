@@ -1,15 +1,17 @@
-version: "3.9"
-
 services:
   backend:
     build: ./backend
     container_name: pyglass-backend
     ports:
       - "8000:8000"
-    env_file:
-      - ./backend/.env
-    depends_on:
-      - db
+    environment:
+      MYSQL_HOST: bzlnqbbgyuhw1bhri2gj-mysql.services.clever-cloud.com
+      MYSQL_DATABASE: bzlnqbbgyuhw1bhri2gj
+      MYSQL_USER: u0jvl3scb0cniaye
+      MYSQL_PASSWORD: Oh6o8ZnWvIpadFa1eq0e
+      MYSQL_PORT: 3306
+    #depends_on:
+    #  - db  # <-- borrar porque no hay db local
 
   frontend:
     build: ./frontend
@@ -19,19 +21,23 @@ services:
     depends_on:
       - backend
 
-  db:
-    image: mysql:8.0
-    container_name: pyglass-db
-    restart: always
-    environment:
-      MYSQL_ROOT_PASSWORD: rootpass
-      MYSQL_DATABASE: pyglass
-      MYSQL_USER: pyglass_user
-      MYSQL_PASSWORD: pyglass_pass
-    ports:
-      - "3307:3306"
-    volumes:
-      - db_data:/var/lib/mysql
 
-volumes:
-  db_data:
+  # El contenedor db local ya no es estrictamente necesario,
+  # porque tu backend apunta a la DB remota.
+  # Pero si quieres mantenerlo, lo dejamos comentado.
+  # db:
+  #   image: mysql:8.0
+  #   container_name: pyglass-db
+  #   restart: always
+  #   environment:
+  #     MYSQL_ROOT_PASSWORD: rootpass
+  #     MYSQL_DATABASE: pyglass
+  #     MYSQL_USER: pyglass_user
+  #     MYSQL_PASSWORD: pyglass_pass
+  #   ports:
+  #     - "3307:3306"
+  #   volumes:
+  #     - db_data:/var/lib/mysql
+
+#volumes:
+#  db_data:
