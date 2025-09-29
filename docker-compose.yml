@@ -7,11 +7,11 @@ services:
     ports:
       - "8000:8000"
     environment:
-      MYSQL_ADDON_HOST: bzlnqbbgyuhw1bhri2gj-mysql.services.clever-cloud.com
-      MYSQL_ADDON_DB: bzlnqbbgyuhw1bhri2gj
-      MYSQL_ADDON_USER: u0jvl3scb0cniaye
-      MYSQL_ADDON_PASSWORD: Oh6o8ZnWvIpadFa1eq0e
-      MYSQL_ADDON_PORT: 3306
+      MYSQL_ADDON_HOST: gu9zl0.h.filess.io
+      MYSQL_ADDON_DB: PYGLASS_jaroldarea
+      MYSQL_ADDON_USER: PYGLASS_jaroldarea
+      MYSQL_ADDON_PASSWORD: 201cd5b19447c7b56cff27dd60c200ed8e8470d0
+      MYSQL_ADDON_PORT: 61002
     #dependencias locales comentadas porque apuntas a DB remota
     #depends_on:
     #  - db
