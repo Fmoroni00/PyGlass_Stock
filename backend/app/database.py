@@ -18,7 +18,7 @@ if DB_URI:
 else:
     # Usar variables individuales si no existe la URI
     DB_HOST = os.getenv("MYSQL_ADDON_HOST")
-    DB_PORT = os.getenv("MYSQL_ADDON_PORT", "3306")  # valor por defecto
+    DB_PORT = os.getenv("MYSQL_ADDON_PORT")  # valor por defecto
     DB_NAME = os.getenv("MYSQL_ADDON_DB")
     DB_USER = os.getenv("MYSQL_ADDON_USER")
     DB_PASSWORD = os.getenv("MYSQL_ADDON_PASSWORD")
