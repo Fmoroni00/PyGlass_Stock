@@ -131,7 +131,6 @@ export default function Materials() {
                   <th className="fw-semibold">ID</th>
                   <th className="fw-semibold">Nombre</th>
                   <th className="fw-semibold">Tipo</th>
-                  <th className="fw-semibold">Color</th>
                   <th className="fw-semibold">Stock Actual</th>
                   <th className="fw-semibold">Stock Mínimo</th>
                   <th className="fw-semibold">Estado</th>
@@ -147,21 +146,6 @@ export default function Materials() {
                       <td className="fw-semibold">{m.name}</td>
                       <td>
                         <span className="badge bg-primary bg-opacity-10 text-primary">{m.type}</span>
-                      </td>
-                      <td>
-                        <div className="d-flex align-items-center gap-2">
-                          <div
-                            style={{
-                              width: '20px',
-                              height: '20px',
-                              backgroundColor: m.color,
-                              borderRadius: '50%',
-                              border: '2px solid white',
-                              boxShadow: '0 0 0 1px rgba(0,0,0,0.1)'
-                            }}
-                          ></div>
-                          <span className="small">{m.color}</span>
-                        </div>
                       </td>
                       <td>
                         {editingId === m.id ? (
@@ -248,22 +232,6 @@ export default function Materials() {
                   </div>
 
                   <div className="row g-3 mb-3">
-                    <div className="col-6">
-                      <small className="text-muted d-block mb-1">Color</small>
-                      <div className="d-flex align-items-center gap-2">
-                        <div
-                          style={{
-                            width: '20px',
-                            height: '20px',
-                            backgroundColor: m.color,
-                            borderRadius: '50%',
-                            border: '2px solid white',
-                            boxShadow: '0 0 0 1px rgba(0,0,0,0.1)'
-                          }}
-                        ></div>
-                        <span className="small">{m.color}</span>
-                      </div>
-                    </div>
                     <div className="col-6">
                       <small className="text-muted d-block mb-1">Estado</small>
                       <span className={`badge bg-${stockStatus}`}>
