@@ -12,6 +12,7 @@ export default function App() {
   const [logged, setLogged] = useState(false);
   const [page, setPage] = useState("materials");
   const [isValidating, setIsValidating] = useState(true);
+  const [showMenu, setShowMenu] = useState(false);
 
   useEffect(() => {
     const validateToken = async () => {
@@ -26,7 +27,6 @@ export default function App() {
       try {
         setToken(token);
 
-        // Intenta hacer una petición a materials para validar el token
         const response = await fetch(`${API_URL}/materials/`, {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -37,13 +37,11 @@ export default function App() {
         if (response.ok) {
           setLogged(true);
         } else {
-          // Token inválido o expirado
           localStorage.removeItem("token");
           setToken(null);
           setLogged(false);
         }
       } catch (error) {
-        // Error de red o servidor
         console.error("Error validating token:", error);
         localStorage.removeItem("token");
         setToken(null);
@@ -61,58 +59,23 @@ export default function App() {
     setToken(null);
     setLogged(false);
     setPage("materials");
+    setShowMenu(false);
   };
 
-  const baseButtonStyle = {
-    padding: '10px 16px',
-    borderRadius: '8px',
-    border: 'none',
-    fontSize: '14px',
-    fontWeight: '500',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    whiteSpace: 'nowrap'
+  const handlePageChange = (newPage) => {
+    setPage(newPage);
+    setShowMenu(false);
   };
 
-  const getButtonStyle = (isActive = false) => ({
-    ...baseButtonStyle,
-    backgroundColor: isActive ? '#dbeafe' : 'rgba(255, 255, 255, 0.8)',
-    color: isActive ? '#1d4ed8' : '#374151',
-    boxShadow: isActive ? '0 2px 8px rgba(29, 78, 216, 0.2)' : '0 2px 6px rgba(0,0,0,0.05)',
-    fontWeight: isActive ? '600' : '500'
-  });
-
-  // Pantalla de carga mientras valida el token
   if (isValidating) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #f8fafc, #e0f2fe, #cffafe)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontFamily: "'Inter','Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{
-            width: '48px',
-            height: '48px',
-            border: '4px solid rgba(59, 130, 246, 0.2)',
-            borderTop: '4px solid #3b82f6',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite',
-            margin: '0 auto 16px'
-          }}></div>
-          <p style={{ color: '#64748b', fontSize: '14px' }}>Validando sesión...</p>
-          <style>{`
-            @keyframes spin {
-              0% { transform: rotate(0deg); }
-              100% { transform: rotate(360deg); }
-            }
-          `}</style>
+      <div className="min-vh-100 d-flex align-items-center justify-content-center"
+           style={{ background: 'linear-gradient(135deg, #f8fafc, #e0f2fe, #cffafe)' }}>
+        <div className="text-center">
+          <div className="spinner-border text-primary mb-3" role="status" style={{ width: '3rem', height: '3rem' }}>
+            <span className="visually-hidden">Cargando...</span>
+          </div>
+          <p className="text-muted">Validando sesión...</p>
         </div>
       </div>
     );
@@ -120,158 +83,143 @@ export default function App() {
 
   if (!logged) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #f8fafc, #e0f2fe, #cffafe)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '20px',
-        fontFamily: "'Inter','Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
-      }}>
-        <div style={{
-          backgroundColor: 'rgba(255, 255, 255, 0.8)',
-          backdropFilter: 'blur(10px)',
-          borderRadius: '24px',
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.1)',
-          border: '1px solid rgba(255, 255, 255, 0.3)',
-          padding: '48px',
+      <div className="min-vh-100 d-flex align-items-center justify-content-center p-3"
+           style={{ background: 'linear-gradient(135deg, #f8fafc, #e0f2fe, #cffafe)' }}>
+        <div className="card shadow-lg border-0" style={{
+          maxWidth: '400px',
           width: '100%',
-          maxWidth: '400px'
+          backgroundColor: 'rgba(255, 255, 255, 0.9)',
+          backdropFilter: 'blur(10px)'
         }}>
-          <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '64px',
-              height: '64px',
-              background: 'linear-gradient(135deg, #3b82f6, #06b6d4)',
-              borderRadius: '50%',
-              marginBottom: '16px',
-              fontSize: '24px'
-            }}>
-              📦
+          <div className="card-body p-4 p-md-5">
+            <div className="text-center mb-4">
+              <div className="d-inline-flex align-items-center justify-content-center rounded-circle mb-3"
+                   style={{
+                     width: '64px',
+                     height: '64px',
+                     background: 'linear-gradient(135deg, #3b82f6, #06b6d4)',
+                     fontSize: '24px'
+                   }}>
+                📦
+              </div>
+              <h1 className="h2 fw-bold mb-2" style={{
+                background: 'linear-gradient(135deg, #1d4ed8, #0891b2)',
+                WebkitBackgroundClip: 'text',
+                backgroundClip: 'text',
+                WebkitTextFillColor: 'transparent'
+              }}>
+                PyGlass Stock
+              </h1>
+              <p className="text-muted small mb-0">Sistema de Inventario para Vidriería</p>
             </div>
-            <h1 style={{
-              fontSize: '32px',
-              fontWeight: 'bold',
-              background: 'linear-gradient(135deg, #1d4ed8, #0891b2)',
-              WebkitBackgroundClip: 'text',
-              backgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              margin: '0 0 8px 0'
-            }}>
-              PyGlass Stock
-            </h1>
-            <p style={{ color: '#64748b', fontSize: '14px', margin: 0 }}>
-              Sistema de Inventario para Vidriería
-            </p>
+            <Login onLogin={() => setLogged(true)} />
           </div>
-          <Login onLogin={() => setLogged(true)} />
         </div>
       </div>
     );
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #f8fafc, #e0f2fe, #cffafe)',
-      fontFamily: "'Inter','Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
-    }}>
-      <header style={{
-        backgroundColor: 'rgba(255, 255, 255, 0.8)',
-        backdropFilter: 'blur(10px)',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.3)',
-        boxShadow: '0 2px 20px rgba(0, 0, 0, 0.05)',
-        position: 'sticky',
-        top: 0,
-        zIndex: 1000
-      }}>
-        <div style={{
-          maxWidth: '1200px',
-          margin: '0 auto',
-          padding: '16px 24px'
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '16px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{
-                width: '40px',
-                height: '40px',
-                background: 'linear-gradient(135deg, #3b82f6, #06b6d4)',
-                borderRadius: '12px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '16px'
-              }}>
-                📦
-              </div>
-              <div>
-                <h1 style={{
-                  fontSize: '20px',
-                  fontWeight: 'bold',
-                  background: 'linear-gradient(135deg, #1d4ed8, #0891b2)',
-                  WebkitBackgroundClip: 'text',
-                  backgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  margin: 0
-                }}>
-                  PyGlass Stock
-                </h1>
-                <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>
-                  Sistema de Inventario
-                </p>
-              </div>
+    <div className="min-vh-100" style={{ background: 'linear-gradient(135deg, #f8fafc, #e0f2fe, #cffafe)' }}>
+      {/* Header/Navbar */}
+      <nav className="navbar navbar-expand-lg sticky-top shadow-sm"
+           style={{
+             backgroundColor: 'rgba(255, 255, 255, 0.9)',
+             backdropFilter: 'blur(10px)'
+           }}>
+        <div className="container-fluid px-3 px-lg-4">
+          {/* Logo y título */}
+          <div className="d-flex align-items-center gap-2 gap-md-3">
+            <div className="rounded-3 d-flex align-items-center justify-content-center"
+                 style={{
+                   width: '40px',
+                   height: '40px',
+                   background: 'linear-gradient(135deg, #3b82f6, #06b6d4)',
+                   fontSize: '16px'
+                 }}>
+              📦
             </div>
+            <div>
+              <h1 className="h5 fw-bold mb-0" style={{
+                background: 'linear-gradient(135deg, #1d4ed8, #0891b2)',
+                WebkitBackgroundClip: 'text',
+                backgroundClip: 'text',
+                WebkitTextFillColor: 'transparent'
+              }}>
+                PyGlass Stock
+              </h1>
+              <p className="small text-muted mb-0 d-none d-sm-block">Sistema de Inventario</p>
+            </div>
+          </div>
 
-            <nav style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <button style={getButtonStyle(page === 'materials')} onClick={() => setPage("materials")}>🧱 Materias Primas</button>
-              <button style={getButtonStyle(page === 'products')} onClick={() => setPage("products")}>📋 Productos</button>
-              <button style={getButtonStyle(page === 'purchases')} onClick={() => setPage("purchases")}>🛒 Órdenes de Compra</button>
-              <button style={getButtonStyle(page === 'cardex')} onClick={() => setPage("cardex")}>📊 Cardex</button>
+          {/* Botón hamburguesa móvil */}
+          <button
+            className="navbar-toggler border-0"
+            type="button"
+            onClick={() => setShowMenu(!showMenu)}
+            style={{ padding: '0.5rem' }}
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+
+          {/* Menú de navegación */}
+          <div className={`collapse navbar-collapse ${showMenu ? 'show' : ''}`}>
+            <div className="navbar-nav ms-auto gap-2 mt-3 mt-lg-0">
               <button
-                style={{
-                  ...baseButtonStyle,
-                  background: 'linear-gradient(135deg, #dc2626, #b91c1c)',
-                  color: 'white',
-                  boxShadow: '0 2px 8px rgba(220, 38, 38, 0.3)',
-                  fontWeight: '600'
-                }}
+                className={`btn btn-sm ${page === 'materials' ? 'btn-primary' : 'btn-outline-primary'}`}
+                onClick={() => handlePageChange("materials")}
+              >
+                🧱 <span className="d-none d-md-inline">Materias Primas</span>
+                <span className="d-md-none">Materias</span>
+              </button>
+              <button
+                className={`btn btn-sm ${page === 'products' ? 'btn-primary' : 'btn-outline-primary'}`}
+                onClick={() => handlePageChange("products")}
+              >
+                📋 Productos
+              </button>
+              <button
+                className={`btn btn-sm ${page === 'purchases' ? 'btn-primary' : 'btn-outline-primary'}`}
+                onClick={() => handlePageChange("purchases")}
+              >
+                🛒 <span className="d-none d-md-inline">Órdenes</span>
+                <span className="d-md-none">Compras</span>
+              </button>
+              <button
+                className={`btn btn-sm ${page === 'cardex' ? 'btn-primary' : 'btn-outline-primary'}`}
+                onClick={() => handlePageChange("cardex")}
+              >
+                📊 Cardex
+              </button>
+              <button
+                className="btn btn-sm btn-danger"
                 onClick={handleLogout}
               >
-                🚪 Cerrar Sesión
+                🚪 <span className="d-none d-sm-inline">Cerrar Sesión</span>
+                <span className="d-sm-none">Salir</span>
               </button>
-            </nav>
+            </div>
           </div>
         </div>
-      </header>
+      </nav>
 
-      <main style={{
-        maxWidth: '1200px',
-        margin: '0 auto',
-        padding: '32px 24px'
-      }}>
-        <div style={{
-          backgroundColor: 'rgba(255, 255, 255, 0.8)',
+      {/* Contenido principal */}
+      <main className="container-fluid px-3 px-lg-4 py-4">
+        <div className="card shadow-lg border-0" style={{
+          backgroundColor: 'rgba(255, 255, 255, 0.9)',
           backdropFilter: 'blur(10px)',
-          borderRadius: '20px',
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.1)',
-          border: '1px solid rgba(255, 255, 255, 0.3)',
-          padding: '32px',
           minHeight: '500px'
         }}>
-          {page === "materials" && <Materials />}
-          {page === "products" && <Products />}
-          {page === "purchases" && <Purchases />}
-          {page === "cardex" && <Cardex />}
+          <div className="card-body p-3 p-md-4">
+            {page === "materials" && <Materials />}
+            {page === "products" && <Products />}
+            {page === "purchases" && <Purchases />}
+            {page === "cardex" && <Cardex />}
+          </div>
         </div>
       </main>
     </div>

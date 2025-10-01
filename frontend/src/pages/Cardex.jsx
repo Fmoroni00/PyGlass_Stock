@@ -25,8 +25,6 @@ const handleResponse = async (response) => {
     let errorMessage = "Error en la petición";
     try {
       const error = await response.json();
-      console.log("Error response:", error);
-
       if (typeof error === 'string') {
         errorMessage = error;
       } else if (error.detail) {
@@ -70,8 +68,6 @@ export default function Cardex() {
   const fetchCardex = async () => {
     try {
       setIsLoading(true);
-      console.log(`Fetching Kardex from: ${API_URL}/kardex/`);
-
       const res = await api.getKardex();
       setRecords(Array.isArray(res) ? res : []);
       setError(null);
@@ -86,15 +82,14 @@ export default function Cardex() {
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     if (isNaN(date)) {
-        return "Fecha inválida";
+      return "Fecha inválida";
     }
     return date.toLocaleString("es-ES", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
       hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit"
+      minute: "2-digit"
     });
   };
 
@@ -118,17 +113,6 @@ export default function Cardex() {
       type: 'unknown',
       id: record.id || '-',
     };
-  };
-
-  const getItemBadgeStyle = (itemType) => {
-      switch (itemType) {
-          case 'material':
-              return styles.itemMaterialBadge;
-          case 'product':
-              return styles.itemProductBadge;
-          default:
-              return styles.movementDefault;
-      }
   };
 
   const getMovementIcon = (movementType) => {
@@ -167,21 +151,21 @@ export default function Cardex() {
     }
   };
 
-  const getMovementStyle = (movementType) => {
+  const getMovementBadgeClass = (movementType) => {
     switch (movementType?.toLowerCase()) {
       case "entrada":
       case "compra":
       case "ingreso":
-        return styles.movementIn;
+        return "bg-success";
       case "salida":
       case "venta":
       case "consumo":
-        return styles.movementOut;
+        return "bg-danger";
       case "ajuste":
       case "inventario":
-        return styles.movementAdjust;
+        return "bg-warning";
       default:
-        return styles.movementDefault;
+        return "bg-secondary";
     }
   };
 
@@ -189,382 +173,185 @@ export default function Cardex() {
     const movementType = record.movement_type?.toLowerCase() || '';
     const quantity = Math.abs(record.quantity);
 
-    if (movementType.includes('salida') ||
-        movementType.includes('venta') ||
-        movementType.includes('consumo')) {
+    if (movementType.includes('salida') || movementType.includes('venta') || movementType.includes('consumo')) {
       return `-${quantity}`;
     }
-
-    if (movementType.includes('entrada') ||
-        movementType.includes('compra') ||
-        movementType.includes('ingreso')) {
+    if (movementType.includes('entrada') || movementType.includes('compra') || movementType.includes('ingreso')) {
       return `+${quantity}`;
     }
-
     return record.quantity >= 0 ? `+${quantity}` : `-${quantity}`;
   };
 
   if (isLoading) {
     return (
-      <div style={styles.container}>
-        <div style={styles.loadingContainer}>
-          <div style={styles.spinner}></div>
-          <p style={styles.loadingText}>Cargando movimientos...</p>
+      <div className="d-flex flex-column align-items-center justify-content-center" style={{ minHeight: '300px' }}>
+        <div className="spinner-border text-primary mb-3" role="status" style={{ width: '3rem', height: '3rem' }}>
+          <span className="visually-hidden">Cargando...</span>
         </div>
+        <p className="text-muted">Cargando movimientos...</p>
       </div>
     );
   }
 
   return (
-    <>
-      <style>
-        {`
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-          .tableRow:hover {
-            background-color: #f9fafb !important;
-          }
-          .refresh-button:hover:not(:disabled) {
-            opacity: 0.9;
-          }
-          .refresh-button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-          }
-          .table-container {
-            overflow-x: auto;
-          }
-
-          @media (prefers-color-scheme: dark) {
-            .dark-container { background-color: #ffffff !important; }
-            .dark-header { background-color: #f9fafb !important; }
-            .dark-title { color: #1e40af !important; }
-            .dark-subtitle { color: #64748b !important; }
-            .dark-table-container { background-color: white !important; }
-            .dark-table-header { background-color: #f1f5f9 !important; border-color: #e2e8f0 !important; }
-            .dark-header-cell { color: #374151 !important; border-color: #e2e8f0 !important; }
-            .dark-table-row { border-color: #f1f5f9 !important; }
-            .dark-table-row:hover { background-color: #f9fafb !important; }
-            .dark-cell, .dark-cell-name { color: #374151 !important; border-color: #f8fafc !important; }
-          }
-        `}
-      </style>
-      <div style={styles.container} className="dark-container">
-        <div style={styles.header} className="dark-header">
-          <div style={styles.titleSection}>
-            <div style={styles.iconContainer}>📊</div>
+    <div>
+      {/* Header */}
+      <div className="row align-items-center mb-4">
+        <div className="col-md-8">
+          <div className="d-flex align-items-center gap-3">
+            <div className="bg-info bg-opacity-10 p-3 rounded-3">
+              <span style={{ fontSize: '32px' }}>📊</span>
+            </div>
             <div>
-              <h1 style={styles.title} className="dark-title">Kardex</h1>
-              <p style={styles.subtitle} className="dark-subtitle">Historial de movimientos de inventario</p>
+              <h1 className="h3 fw-bold text-info mb-1">Kardex</h1>
+              <p className="text-muted mb-0 small">Historial de movimientos de inventario</p>
             </div>
           </div>
-          <button
-            onClick={fetchCardex}
-            style={styles.refreshButton}
-            className="refresh-button"
-            disabled={isLoading}
-          >
-            🔄 Actualizar
+        </div>
+        <div className="col-md-4 text-md-end mt-3 mt-md-0">
+          <button onClick={fetchCardex} className="btn btn-info d-inline-flex align-items-center gap-2" disabled={isLoading}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4C7.58 4 4 7.58 4 12S7.58 20 12 20C15.73 20 18.84 17.45 19.73 14H17.65C16.83 16.33 14.61 18 12 18C8.69 18 6 15.31 6 12S8.69 6 12 6C13.66 6 15.14 6.69 16.22 7.78L13 11H20V4L17.65 6.35Z" fill="currentColor"/>
+            </svg>
+            Actualizar
           </button>
         </div>
+      </div>
 
-        {error && (
-          <div style={styles.errorContainer}>
-            <div style={styles.errorIcon}>⚠️</div>
-            <p style={styles.errorText}>{error}</p>
-          </div>
-        )}
+      {/* Error Alert */}
+      {error && (
+        <div className="alert alert-danger d-flex align-items-center mb-4" role="alert">
+          <span className="me-2">⚠️</span>
+          <div>{error}</div>
+        </div>
+      )}
 
-        <div style={styles.tableContainer} className="table-container dark-table-container">
-          <div style={styles.tableWrapper}>
-            <div style={styles.tableHeader} className="dark-table-header">
-              <div style={styles.headerCell} className="dark-header-cell">Fecha</div>
-              <div style={styles.headerCell} className="dark-header-cell">Material/Producto</div>
-              <div style={styles.headerCell} className="dark-header-cell">Movimiento</div>
-              <div style={styles.headerCell} className="dark-header-cell">Cantidad</div>
-              <div style={styles.headerCell} className="dark-header-cell">Stock Anterior</div>
-              <div style={styles.headerCell} className="dark-header-cell">Stock Nuevo</div>
-              <div style={styles.headerCell} className="dark-header-cell">Usuario</div>
-              <div style={styles.headerCell} className="dark-header-cell">Observaciones</div>
-            </div>
+      {/* Desktop Table */}
+      <div className="card shadow-sm border-0 d-none d-xl-block">
+        <div className="table-responsive">
+          <table className="table table-hover mb-0">
+            <thead className="table-light">
+              <tr>
+                <th className="fw-semibold">Fecha</th>
+                <th className="fw-semibold">Item</th>
+                <th className="fw-semibold">Movimiento</th>
+                <th className="fw-semibold">Cantidad</th>
+                <th className="fw-semibold">Stock Anterior</th>
+                <th className="fw-semibold">Stock Nuevo</th>
+                <th className="fw-semibold">Usuario</th>
+                <th className="fw-semibold">Observaciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {records.map((record, index) => {
+                const itemDetails = getItemDetails(record);
+                const movementBadgeClass = getMovementBadgeClass(record.movement_type);
 
-            {records.map((record, index) => {
-              const itemDetails = getItemDetails(record);
-              const movementStyle = getMovementStyle(record.movement_type);
-              const rowClassName = `tableRow dark-table-row ${index % 2 === 0 ? '' : 'bg-gray-50'}`;
+                return (
+                  <tr key={record.id || index}>
+                    <td className="align-middle">
+                      <small>{formatDate(record.date)}</small>
+                    </td>
+                    <td className="align-middle">
+                      <div className="d-flex align-items-center gap-2">
+                        <span className={`badge ${itemDetails.type === 'material' ? 'bg-primary' : 'bg-success'} bg-opacity-25 text-${itemDetails.type === 'material' ? 'primary' : 'success'}`}>
+                          {itemDetails.type === 'material' ? 'M' : 'P'}
+                        </span>
+                        <span className="fw-semibold">{itemDetails.name}</span>
+                      </div>
+                    </td>
+                    <td className="align-middle">
+                      <span className={`badge ${movementBadgeClass}`}>
+                        {getMovementIcon(record.movement_type)} {getMovementLabel(record.movement_type)}
+                      </span>
+                    </td>
+                    <td className="align-middle fw-bold">
+                      {formatQuantity(record)}
+                    </td>
+                    <td className="align-middle">{record.stock_anterior || 0}</td>
+                    <td className="align-middle">{record.stock_nuevo || 0}</td>
+                    <td className="align-middle">{record.username || record.user_id || '-'}</td>
+                    <td className="align-middle">
+                      <small className="text-muted">{record.observaciones || '-'}</small>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
-              return (
-                <div key={record.id || index} style={styles.tableRow} className={rowClassName}>
-                  <div style={styles.cell} className="dark-cell">
-                    {formatDate(record.date)}
-                  </div>
-                  <div style={styles.cellName} className="dark-cell-name">
-                    <span
-                      style={{
-                        ...styles.itemBadge,
-                        ...getItemBadgeStyle(itemDetails.type),
-                      }}
-                    >
-                      {itemDetails.type === 'material' ? 'M' : itemDetails.type === 'product' ? 'P' : '?'}
+      {/* Mobile/Tablet Cards */}
+      <div className="d-xl-none">
+        {records.map((record, index) => {
+          const itemDetails = getItemDetails(record);
+          const movementBadgeClass = getMovementBadgeClass(record.movement_type);
+
+          return (
+            <div key={record.id || index} className="card shadow-sm border-0 mb-3">
+              <div className="card-body">
+                {/* Header con fecha y tipo */}
+                <div className="d-flex justify-content-between align-items-start mb-3">
+                  <div>
+                    <span className={`badge ${itemDetails.type === 'material' ? 'bg-primary' : 'bg-success'} mb-2`}>
+                      {itemDetails.type === 'material' ? '🧱 Material' : '📋 Producto'}
                     </span>
-                    <span style={{ marginLeft: '8px' }}>{itemDetails.name}</span>
+                    <h6 className="fw-bold mb-0">{itemDetails.name}</h6>
                   </div>
-                  <div style={styles.cell} className="dark-cell">
-                    <span
-                      style={{
-                        ...styles.movementBadge,
-                        ...movementStyle,
-                      }}
-                    >
-                      {getMovementIcon(record.movement_type)} {getMovementLabel(record.movement_type)}
-                    </span>
+                  <small className="text-muted">{formatDate(record.date)}</small>
+                </div>
+
+                {/* Movimiento */}
+                <div className="mb-3">
+                  <span className={`badge ${movementBadgeClass} fs-6`}>
+                    {getMovementIcon(record.movement_type)} {getMovementLabel(record.movement_type)}
+                  </span>
+                </div>
+
+                {/* Información en grid */}
+                <div className="row g-3 mb-3">
+                  <div className="col-6">
+                    <small className="text-muted d-block mb-1">Cantidad</small>
+                    <span className="fw-bold fs-5">{formatQuantity(record)}</span>
                   </div>
-                  <div style={{ ...styles.cell, fontWeight: '700' }} className="dark-cell">
-                    {formatQuantity(record)}
+                  <div className="col-6">
+                    <small className="text-muted d-block mb-1">Stock Anterior</small>
+                    <span className="fw-semibold">{record.stock_anterior || 0}</span>
                   </div>
-                  <div style={styles.cell} className="dark-cell">
-                    {record.stock_anterior || 0}
+                  <div className="col-6">
+                    <small className="text-muted d-block mb-1">Stock Nuevo</small>
+                    <span className="fw-semibold text-success">{record.stock_nuevo || 0}</span>
                   </div>
-                  <div style={styles.cell} className="dark-cell">
-                    {record.stock_nuevo || 0}
-                  </div>
-                  <div style={styles.cell} className="dark-cell">
-                    {record.username || record.user_id || '-'}
-                  </div>
-                  <div style={styles.cell} className="dark-cell">
-                    {record.observaciones || '-'}
+                  <div className="col-6">
+                    <small className="text-muted d-block mb-1">Usuario</small>
+                    <span className="small">{record.username || record.user_id || '-'}</span>
                   </div>
                 </div>
-              );
-            })}
+
+                {/* Observaciones */}
+                {record.observaciones && (
+                  <div className="border-top pt-2">
+                    <small className="text-muted d-block mb-1">Observaciones</small>
+                    <small>{record.observaciones}</small>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Empty State */}
+      {records.length === 0 && !error && !isLoading && (
+        <div className="card shadow-sm border-0">
+          <div className="card-body text-center py-5">
+            <div className="mb-3" style={{ fontSize: '3rem' }}>📊</div>
+            <h3 className="h5 fw-semibold mb-2">No hay movimientos registrados</h3>
+            <p className="text-muted mb-0">Aún no se han realizado movimientos de inventario</p>
           </div>
         </div>
-
-        {records.length === 0 && !error && !isLoading && (
-          <div style={styles.emptyState}>
-            <div style={styles.emptyIcon}>📦</div>
-            <h3 style={styles.emptyTitle}>No hay movimientos registrados</h3>
-            <p style={styles.emptyText}>
-              Aún no se han realizado movimientos de inventario.
-            </p>
-          </div>
-        )}
-      </div>
-    </>
+      )}
+    </div>
   );
 }
-
-const styles = {
-  container: {
-    padding: "24px",
-    maxWidth: "1400px",
-    margin: "0 auto",
-    backgroundColor: "#ffffff",
-    minHeight: "100vh",
-    fontFamily: "'Inter','Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
-    transition: 'background-color 0.3s',
-  },
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "32px",
-    backgroundColor: "white",
-    padding: "20px",
-    borderRadius: "12px",
-    boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
-    transition: 'background-color 0.3s, box-shadow 0.3s',
-  },
-  titleSection: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px"
-  },
-  iconContainer: {
-    fontSize: "28px"
-  },
-  title: {
-    margin: 0,
-    fontSize: "24px",
-    fontWeight: "700",
-    color: "#1e40af",
-    transition: 'color 0.3s',
-  },
-  subtitle: {
-    margin: 0,
-    fontSize: "14px",
-    color: "#64748b",
-    transition: 'color 0.3s',
-  },
-  refreshButton: {
-    backgroundColor: "#2563eb",
-    color: "white",
-    border: "none",
-    borderRadius: "8px",
-    padding: "10px 16px",
-    cursor: "pointer",
-    fontWeight: "600",
-    fontSize: "14px",
-    transition: "background-color 0.2s, opacity 0.2s ease",
-  },
-  errorContainer: {
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    backgroundColor: "#fef2f2",
-    border: "1px solid #fecaca",
-    borderRadius: "10px",
-    padding: "12px",
-    marginBottom: "20px",
-  },
-  errorIcon: {
-    fontSize: "18px",
-    color: "#ef4444"
-  },
-  errorText: {
-    color: "#dc2626",
-    margin: 0,
-    fontSize: "14px"
-  },
-  tableContainer: {
-    backgroundColor: "white",
-    borderRadius: "12px",
-    boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
-    overflow: "hidden",
-    transition: 'background-color 0.3s, box-shadow 0.3s',
-  },
-  tableWrapper: {
-    display: "flex",
-    flexDirection: "column"
-  },
-  tableHeader: {
-    display: "grid",
-    gridTemplateColumns: "160px 200px 140px 100px 120px 120px 150px 200px",
-    backgroundColor: "#f1f5f9",
-    borderBottom: "1px solid #e2e8f0",
-    transition: 'background-color 0.3s, border-color 0.3s',
-  },
-  headerCell: {
-    padding: "12px",
-    fontWeight: "600",
-    color: "#374151",
-    borderRight: "1px solid #e2e8f0",
-    fontSize: "13px",
-    textTransform: "uppercase",
-    letterSpacing: "0.05em",
-    transition: 'color 0.3s, border-color 0.3s',
-  },
-  tableRow: {
-    display: "grid",
-    gridTemplateColumns: "160px 200px 140px 100px 120px 120px 150px 200px",
-    borderBottom: "1px solid #f1f5f9",
-    transition: "background-color 0.1s ease, border-color 0.3s",
-  },
-  cell: {
-    padding: "12px",
-    fontSize: "14px",
-    color: "#374151",
-    borderRight: "1px solid #f8fafc",
-    alignItems: "center",
-    display: "flex",
-    transition: 'color 0.3s, border-color 0.3s',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-  },
-  cellName: {
-    padding: "12px",
-    fontWeight: "600",
-    color: "#1e293b",
-    borderRight: "1px solid #f8fafc",
-    display: 'flex',
-    alignItems: 'center',
-    transition: 'color 0.3s, border-color 0.3s',
-  },
-  itemBadge: {
-    padding: "2px 6px",
-    borderRadius: "4px",
-    fontSize: "11px",
-    fontWeight: "700",
-    textTransform: "uppercase",
-    width: '18px',
-    textAlign: 'center',
-    transition: 'background-color 0.3s, color 0.3s',
-  },
-  itemMaterialBadge: {
-    backgroundColor: "#dbeafe",
-    color: "#1e40af",
-  },
-  itemProductBadge: {
-    backgroundColor: "#d1fae5",
-    color: "#059669",
-  },
-  movementBadge: {
-    padding: "4px 8px",
-    borderRadius: "6px",
-    fontSize: "12px",
-    fontWeight: "600",
-    whiteSpace: "nowrap",
-    transition: 'background-color 0.3s, color 0.3s',
-  },
-  movementIn: {
-    backgroundColor: "#d1fae5",
-    color: "#059669"
-  },
-  movementOut: {
-    backgroundColor: "#fee2e2",
-    color: "#dc2626"
-  },
-  movementAdjust: {
-    backgroundColor: "#fef9c3",
-    color: "#d97706"
-  },
-  movementDefault: {
-    backgroundColor: "#f3f4f6",
-    color: "#6b7280"
-  },
-  loadingContainer: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: "300px",
-    gap: "12px",
-  },
-  spinner: {
-    width: "40px",
-    height: "40px",
-    border: "4px solid #e2e8f0",
-    borderTop: "4px solid #2563eb",
-    borderRadius: "50%",
-    animation: "spin 1s linear infinite",
-  },
-  loadingText: {
-    fontSize: "16px",
-    color: "#64748b"
-  },
-  emptyState: {
-    textAlign: "center",
-    padding: "60px 20px",
-    backgroundColor: "white",
-    borderRadius: "12px",
-    marginTop: "20px",
-    boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
-  },
-  emptyIcon: {
-    fontSize: "48px",
-    marginBottom: "12px"
-  },
-  emptyTitle: {
-    fontSize: "18px",
-    fontWeight: "600",
-    color: "#374151",
-    margin: "0 0 8px 0",
-  },
-  emptyText: {
-    fontSize: "14px",
-    color: "#6b7280",
-    margin: 0,
-  },
-};

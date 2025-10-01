@@ -5,102 +5,98 @@ export default function Login({ onLogin }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
+    setIsLoading(true);
+
     try {
       const data = await api.login(username, password);
       setToken(data.access_token);
       onLogin();
     } catch (err) {
       setError("Credenciales inválidas");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const styles = {
-    container: {
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      gap: "24px",
-      maxWidth: "400px",
-      width: "100%",
-    },
-    form: {
-      display: "flex",
-      flexDirection: "column",
-      gap: "20px",
-      width: "100%",
-    },
-    input: {
-      width: "100%",
-      padding: "16px 20px",
-      border: "2px solid #e5e7eb",
-      borderRadius: "12px",
-      fontSize: "16px",
-      transition: "all 0.3s ease",
-      outline: "none",
-      background: "#ffffff",
-      boxSizing: "border-box",
-      fontWeight: "500",
-      color: "#1e293b",
-    },
-    button: {
-      width: "100%",
-      padding: "18px",
-      background: "linear-gradient(135deg, #3b82f6 0%, #60a5fa 50%, #93c5fd 100%)",
-      color: "white",
-      border: "none",
-      borderRadius: "12px",
-      fontSize: "16px",
-      fontWeight: "600",
-      cursor: "pointer",
-      transition: "all 0.3s ease",
-      boxShadow: "0 4px 12px rgba(59, 130, 246, 0.25)",
-      marginTop: "8px",
-    },
-    error: {
-      background: "#fef2f2",
-      border: "2px solid #fecaca",
-      color: "#dc2626",
-      padding: "12px 16px",
-      borderRadius: "12px",
-      fontSize: "14px",
-      fontWeight: "500",
-      textAlign: "center",
-      width: "100%",
-      boxSizing: "border-box",
-    },
-  };
-
   return (
-    <div style={styles.container}>
-      {/* ❌ Eliminado el h2 con "PyGlass Stock" */}
+    <div className="w-100">
+      <form onSubmit={handleSubmit}>
+        {/* Username Input */}
+        <div className="mb-3">
+          <input
+            type="text"
+            className="form-control form-control-lg"
+            placeholder="Usuario"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+            disabled={isLoading}
+            style={{
+              borderRadius: '12px',
+              border: '2px solid #e5e7eb',
+              padding: '14px 18px',
+              fontSize: '16px',
+              fontWeight: '500'
+            }}
+          />
+        </div>
 
-      <form onSubmit={handleSubmit} style={styles.form}>
-        <input
-          style={styles.input}
-          placeholder="Usuario"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          required
-        />
+        {/* Password Input */}
+        <div className="mb-3">
+          <input
+            type="password"
+            className="form-control form-control-lg"
+            placeholder="Contraseña"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            disabled={isLoading}
+            style={{
+              borderRadius: '12px',
+              border: '2px solid #e5e7eb',
+              padding: '14px 18px',
+              fontSize: '16px',
+              fontWeight: '500'
+            }}
+          />
+        </div>
 
-        <input
-          style={styles.input}
-          type="password"
-          placeholder="Contraseña"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
+        {/* Error Alert */}
+        {error && (
+          <div className="alert alert-danger py-2 mb-3" role="alert">
+            <small className="mb-0">{error}</small>
+          </div>
+        )}
 
-        <button type="submit" style={styles.button}>
-          Iniciar Sesión
+        {/* Submit Button */}
+        <button
+          type="submit"
+          className="btn btn-primary btn-lg w-100 fw-semibold"
+          disabled={isLoading}
+          style={{
+            background: 'linear-gradient(135deg, #3b82f6 0%, #60a5fa 50%, #93c5fd 100%)',
+            border: 'none',
+            borderRadius: '12px',
+            padding: '14px',
+            boxShadow: '0 4px 12px rgba(59, 130, 246, 0.25)',
+            fontSize: '16px'
+          }}
+        >
+          {isLoading ? (
+            <>
+              <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+              Iniciando...
+            </>
+          ) : (
+            'Iniciar Sesión'
+          )}
         </button>
       </form>
-
-      {error && <div style={styles.error}>{error}</div>}
     </div>
   );
 }
