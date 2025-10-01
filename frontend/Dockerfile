@@ -1,5 +1,5 @@
 # Imagen base de Node.js
-FROM node:20
+FROM node:20-slim
 
 # Crear directorio de trabajo
 WORKDIR /app
@@ -16,11 +16,11 @@ COPY . .
 # Construir la app de producción
 RUN npm run build
 
-# Instalar un servidor estático (serve)
+# Instalar servidor estático global
 RUN npm install -g serve
 
 # Exponer puerto
 EXPOSE 5173
 
-# Comando para arrancar frontend
+# Arrancar servidor estático
 CMD ["serve", "-s", "dist", "-l", "5173"]

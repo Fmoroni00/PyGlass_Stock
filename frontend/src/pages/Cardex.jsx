@@ -1,22 +1,6 @@
 import React, { useEffect, useState } from "react";
 
-// =========================================================
-// LÓGICA DE API CENTRALIZADA CON SOPORTE PARA ENTORNO
-// =========================================================
-
-/**
- * 1. URL de la API
- * Se ha evitado el uso de 'import.meta.env' para solucionar un warning de compilación
- * en entornos con target 'es2015'. Usamos la URL de Render ("https://pyglass-stock.onrender.com")
- * como principal, y solo recurrimos a localhost si el entorno de ejecución es detectado como local.
- */
-const API_URL =
-  (typeof window !== 'undefined' &&
-   (window.location.hostname === 'localhost' ||
-    window.location.hostname === '127.0.0.1'))
-    ? "http://127.0.0.1:8000"
-    : "https://pyglass-stock.onrender.com"; // URL de producción proporcionada por el usuario
-
+const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 const getToken = () => {
   if (typeof window !== 'undefined') {

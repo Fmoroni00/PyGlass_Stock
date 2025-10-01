@@ -1,789 +1,587 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 
-// =========================================================
-// LÓGICA DE API CENTRALIZADA CON SOPORTE PARA ENTORNO
-// =========================================================
+const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
-/**
- * 1. URL de la API
- * **CORRECCIÓN:** Se fuerza el uso de la URL de producción (Render)
- * para asegurar la conectividad en el entorno de previsualización (Canvas),
- * ya que el servidor local (127.0.0.1) no está disponible aquí.
- */
-const API_URL = "https://pyglass-stock.onrender.com";
-
-// Variable global mutable para el token
-let token = null;
-
-/**
- * Guardar token en memoria y en localStorage
- */
-function setToken(newToken) {
-  token = newToken;
+const getToken = () => {
   if (typeof window !== 'undefined') {
-    if (newToken) {
-      localStorage.setItem("token", newToken);
-    } else {
-      localStorage.removeItem("token");
-    }
+    return localStorage.getItem("token");
   }
-}
+  return null;
+};
 
-/**
- * Cargar token desde memoria o localStorage
- */
-function loadToken() {
-  if (!token) {
-    // Verificar si estamos en un entorno de navegador
-    if (typeof window !== 'undefined') {
-        token = localStorage.getItem("token");
-    }
-  }
-  return token;
-}
-
-/**
- * Request genérico con autenticación y manejo de errores
- */
-async function request(endpoint, method = "GET", body = null) {
-
-  // USAMOS la API_URL que ahora apunta directamente a Render.
-  const baseUrl = API_URL;
-
-  const options = {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-    },
+const getHeaders = () => {
+  const headers = {
+    "Content-Type": "application/json",
   };
-
-  const authToken = loadToken();
-  if (authToken) {
-    options.headers["Authorization"] = `Bearer ${authToken}`;
+  const token = getToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
   }
+  return headers;
+};
 
-  if (body) {
-    options.body = JSON.stringify(body);
-  }
-
-  // Se añaden reintentos con backoff exponencial para mejorar la resiliencia contra fallos de red
-  // o problemas temporales de Render (hot start/sleep).
-  const MAX_RETRIES = 3;
-  let res;
-
-  for (let i = 0; i < MAX_RETRIES; i++) {
+const handleResponse = async (response) => {
+  if (!response.ok) {
+    let errorMessage = "Error en la petición";
     try {
-      res = await fetch(`${baseUrl}${endpoint}`, options);
-      if (res.ok || res.status < 500) {
-        break; // Éxito o error manejable
-      }
-    } catch (error) {
-      // Ignorar el error de red en el reintento si no es el último intento
-      if (i === MAX_RETRIES - 1) {
-        throw new Error(`Error de red tras ${MAX_RETRIES} intentos: ${error.message}`);
-      }
-    }
-    // Espera exponencial: 500ms, 1000ms, 2000ms...
-    await new Promise(resolve => setTimeout(resolve, 500 * (2 ** i)));
-  }
+      const error = await response.json();
+      console.log("Error response:", error); // Para debugging
 
-  if (!res || !res.ok) {
-    // Si res es null (todos los fetch fallaron por error de red) o no es ok
-    if (!res) throw new Error("Fallo de conexión persistente con el servidor.");
-
-    // Intenta obtener el error detallado del JSON
-    const errorData = await res.json().catch(() => ({}));
-    let errorMessage = `Error ${res.status}: `;
-
-    if (errorData && errorData.detail) {
-        if (typeof errorData.detail === 'string') {
-            errorMessage += errorData.detail;
-        } else if (Array.isArray(errorData.detail)) {
-            // Manejar errores de validación de Pydantic/FastAPI
-            errorMessage += errorData.detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ');
+      if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error.detail) {
+        if (typeof error.detail === 'string') {
+          errorMessage = error.detail;
+        } else if (Array.isArray(error.detail)) {
+          // Si es un error de validación de Pydantic, concatenar mensajes
+          errorMessage = error.detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ');
         } else {
-            errorMessage += "Ocurrió un error desconocido en el servidor.";
+          errorMessage = JSON.stringify(error.detail);
         }
-    } else if (res.statusText) {
-        errorMessage += res.statusText;
-    } else {
-        errorMessage += "Error de red o servidor desconocido.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      } else {
+        errorMessage = JSON.stringify(error);
+      }
+    } catch (e) {
+      errorMessage = `Error ${response.status}: ${response.statusText}`;
     }
-
-    // Loguear el error para debugging
-    console.error("API Error Details:", errorData);
     throw new Error(errorMessage);
   }
+  return response.json();
+};
 
-  // Si la respuesta es 204 No Content (DELETE, PUT), no intentamos parsear JSON
-  if (res.status === 204) {
-      return {};
-  }
-
-  return res.json();
-}
-
-/**
- * Objeto API con todos los endpoints relevantes.
- */
 const api = {
-  // 📦 Materiales
-  getMaterials: () => request("/materials/"),
-
-  // 📝 Órdenes de Compra (Métodos necesarios para este componente)
-  getOrders: () => request("/purchases/orders"),
-  createOrder: (data) => request("/purchases/orders", "POST", data),
-  completeOrder: (orderId) => request(`/purchases/orders/${orderId}/complete`, "PUT"),
-
-  // 🚛 Proveedores
-  getSuppliers: () => request("/suppliers/"),
-  getMaterialSuppliers: (materialId) => request(`/suppliers/by-material/${materialId}`),
+  getKardex: () => {
+    // CORRECCIÓN: Usar la constante API_URL
+    return fetch(`${API_URL}/kardex/`, {
+      headers: getHeaders(),
+    }).then(handleResponse);
+  },
 };
 
 // =========================================================
 // COMPONENTE PRINCIPAL
 // =========================================================
 
-const Purchases = () => {
-  const [materials, setMaterials] = useState([]);
-  const [selectedMaterial, setSelectedMaterial] = useState("");
-  const [selectedMaterialData, setSelectedMaterialData] = useState(null);
-  const [availableSuppliers, setAvailableSuppliers] = useState([]);
-  const [selectedSupplier, setSelectedSupplier] = useState("");
-  const [selectedSupplierData, setSelectedSupplierData] = useState(null);
-  const [quantity, setQuantity] = useState("");
-  const [orders, setOrders] = useState([]);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [isLoading, setIsLoading] = useState(true); // Nuevo estado de carga
+export default function Cardex() {
+  const [records, setRecords] = useState([]);
+  const [error, setError] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const fetchMaterials = async () => {
-    try {
-      const data = await api.getMaterials();
-      setMaterials(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error("Error fetching materials:", err);
-      setError("Error al cargar los materiales: " + err.message);
-    }
-  };
-
-  const fetchOrders = async () => {
-    try {
-      const data = await api.getOrders();
-      // Asegurarse de que el campo 'status' esté en minúsculas para el CSS
-      const formattedOrders = Array.isArray(data)
-        ? data.map(order => ({
-            ...order,
-            status: order.status ? order.status.toLowerCase() : 'pendiente'
-          }))
-        : [];
-      setOrders(formattedOrders);
-    } catch (err) {
-      console.error("Error fetching orders:", err);
-      setError("Error al cargar las órdenes de compra: " + err.message);
-    }
-  };
-
-  const fetchMaterialSuppliers = async (materialId) => {
-    try {
-      const data = await api.getMaterialSuppliers(materialId);
-      setAvailableSuppliers(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error("Error fetching material suppliers:", err);
-      // Fallback a cargar todos los proveedores si la ruta específica falla
-      try {
-        const allSuppliers = await api.getSuppliers();
-        setAvailableSuppliers(Array.isArray(allSuppliers) ? allSuppliers : []);
-      } catch (fallbackErr) {
-        setError("Error al cargar los proveedores: " + err.message);
-      }
-    }
-  };
-
-  // Carga inicial de datos
   useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
-      setError(""); // Limpiar errores previos
-      await Promise.all([
-        fetchMaterials(),
-        fetchOrders()
-      ]);
-      setIsLoading(false);
-    };
-    loadData();
+    fetchCardex();
   }, []);
 
-
-  const handleMaterialChange = async (materialId) => {
-    setSelectedMaterial(materialId);
-    setSelectedSupplier("");
-    setSelectedSupplierData(null);
-    setAvailableSuppliers([]);
-    setError("");
-
-    if (materialId) {
-      const material = materials.find(m => m.id === parseInt(materialId));
-      setSelectedMaterialData(material);
-
-      await fetchMaterialSuppliers(materialId);
-    } else {
-      setSelectedMaterialData(null);
-    }
-  };
-
-  const handleSupplierChange = (supplierId) => {
-    setSelectedSupplier(supplierId);
-    setError("");
-
-    if (supplierId) {
-      const supplier = availableSuppliers.find(s => s.id === parseInt(supplierId));
-      setSelectedSupplierData(supplier);
-    } else {
-      setSelectedSupplierData(null);
-    }
-  };
-
-  const handleCreateOrder = async (e) => {
-    e.preventDefault();
-    setError("");
-    setSuccess("");
-
-    // Validaciones
-    if (!selectedMaterial) {
-      setError("Por favor, selecciona un material.");
-      return;
-    }
-
-    if (!selectedSupplier) {
-      setError("Por favor, selecciona un proveedor.");
-      return;
-    }
-
-    const quantityNum = parseInt(quantity);
-    if (!quantity || quantityNum <= 0 || isNaN(quantityNum)) {
-      setError("Por favor, especifica una cantidad válida mayor a 0.");
-      return;
-    }
-
+  const fetchCardex = async () => {
     try {
-      if (!selectedSupplierData) {
-        setError("Datos del proveedor no encontrados.");
-        return;
-      }
+      setIsLoading(true);
+      // Opcional: Mostrar la URL que se está usando para debug
+      console.log(`Fetching Kardex from: ${API_URL}/kardex/`);
 
-      const orderData = {
-        supplier_id: parseInt(selectedSupplier),
-        material_id: parseInt(selectedMaterial),
-        quantity: quantityNum,
+      const res = await api.getKardex();
+      // Asegurar que 'res' sea un array.
+      setRecords(Array.isArray(res) ? res : []);
+      setError(null);
+    } catch (err) {
+      console.error("Error fetching kardex:", err);
+      // Extraemos el mensaje de error de la instancia Error
+      setError("Error al cargar movimientos de inventario: " + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    // Asegurar que la fecha sea válida antes de formatear
+    if (isNaN(date)) {
+        return "Fecha inválida";
+    }
+    return date.toLocaleString("es-ES", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit" // Añadir segundos para mayor precisión
+    });
+  };
+
+  const getItemDetails = (record) => {
+    // Prioriza material
+    if (record.material_id || record.material_name) {
+      return {
+        name: record.material_name || `Material ID: ${record.material_id}`,
+        type: 'material',
+        id: record.material_id,
       };
+    }
+    // Si no es material, busca producto
+    if (record.product_id || record.product_name) {
+      return {
+        name: record.product_name || `Producto ID: ${record.product_id}`,
+        type: 'product',
+        id: record.product_id,
+      };
+    }
+    // Si no hay ninguno
+    return {
+      name: 'Ítem Desconocido',
+      type: 'unknown',
+      id: record.id || '-',
+    };
+  };
 
-      const result = await api.createOrder(orderData);
+  const getItemBadgeStyle = (itemType) => {
+      switch (itemType) {
+          case 'material':
+              return styles.itemMaterialBadge;
+          case 'product':
+              return styles.itemProductBadge;
+          default:
+              return styles.movementDefault; // Estilo por defecto
+      }
+  };
 
-      setSuccess(`Orden de compra #${result.id} creada exitosamente.`);
-
-      // Limpiar formulario
-      setSelectedMaterial("");
-      setSelectedMaterialData(null);
-      setSelectedSupplier("");
-      setSelectedSupplierData(null);
-      setAvailableSuppliers([]);
-      setQuantity("");
-
-      // Recargar materiales y órdenes (el stock del material habrá cambiado)
-      await fetchMaterials();
-      await fetchOrders();
-    } catch (err) {
-      setError("Error al crear la orden: " + err.message);
+  const getMovementIcon = (movementType) => {
+    switch (movementType?.toLowerCase()) {
+      case "entrada":
+      case "compra":
+      case "ingreso":
+        return "⬆️";
+      case "salida":
+      case "venta":
+      case "consumo":
+        return "⬇️";
+      case "ajuste":
+      case "inventario":
+        return "⚙️";
+      default:
+        return "📦";
     }
   };
 
-  const handleCompleteOrder = async (orderId) => {
-    setError("");
-    setSuccess("");
+  const getMovementLabel = (movementType) => {
+    switch (movementType?.toLowerCase()) {
+      case "entrada":
+      case "compra":
+      case "ingreso":
+        return "Entrada";
+      case "salida":
+      case "venta":
+      case "consumo":
+        return "Salida";
+      case "ajuste":
+      case "inventario":
+        return "Ajuste";
+      default:
+        return movementType || "Movimiento";
+    }
+  };
 
-    try {
-      await api.completeOrder(orderId);
-      setSuccess("Orden de compra completada y stock actualizado.");
-      // Recargar materiales y órdenes (el stock del material habrá cambiado)
-      await fetchMaterials();
-      await fetchOrders();
-    } catch (err) {
-      setError("Error al completar la orden: " + err.message);
+  const getMovementStyle = (movementType) => {
+    switch (movementType?.toLowerCase()) {
+      case "entrada":
+      case "compra":
+      case "ingreso":
+        return styles.movementIn;
+      case "salida":
+      case "venta":
+      case "consumo":
+        return styles.movementOut;
+      case "ajuste":
+      case "inventario":
+        return styles.movementAdjust;
+      default:
+        return styles.movementDefault;
     }
   };
 
   if (isLoading) {
     return (
-        <div className="container" style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', flexDirection: 'column'}}>
-            <h1 style={{color: '#0d9488', fontSize: '1.5rem'}}>Cargando datos del servidor...</h1>
-            <div style={{
-                border: '4px solid rgba(0, 0, 0, 0.1)',
-                borderTop: '4px solid #0d9488',
-                borderRadius: '50%',
-                width: '40px',
-                height: '40px',
-                animation: 'spin 1s linear infinite',
-                marginTop: '1rem'
-            }}></div>
-            <style>{`
-                @keyframes spin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
-                }
-            `}</style>
+      <div style={styles.container}>
+        <div style={styles.loadingContainer}>
+          <div style={styles.spinner}></div>
+          <p style={styles.loadingText}>Cargando movimientos...</p>
         </div>
+      </div>
     );
   }
-
 
   return (
     <>
       <style>
         {`
-          :root {
-            /* Colores Base - Tema de luz brillante */
-            --bg-color: #f7f9fc; /* Fondo claro/blanco roto */
-            --text-color: #1f2937; /* Texto oscuro */
-            --card-bg: #ffffff; /* Fondo de tarjetas blanco puro */
-            --border-color: #e5e7eb; /* Borde claro */
-            --primary-color: #0d9488; /* Teal vibrante como color principal */
-            --primary-hover-color: #0f766e;
-
-            /* Alertas y Estados */
-            --error-bg: #fee2e2; /* Red 100 */
-            --error-text: #b91c1c; /* Red 700 */
-            --success-bg: #dcfce7; /* Green 100 */
-            --success-text: #16a34a; /* Green 700 */
-            --table-header-bg: #f3f4f6; /* Gris muy claro */
-            --yellow-bg: #fffbe6; /* Yellow 50 */
-            --yellow-text: #a16207; /* Yellow 700 */
-            --green-bg: #d1fae5; /* Green 100 */
-            --green-text: #059669; /* Green 600 */
-            --info-bg: #e0f2f1; /* Teal 100 */
-            --info-text: #0d9488; /* Teal 600 */
-            --info-border: #2dd4bf; /* Teal 300 */
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
           }
-
-          /* Modo oscuro anulado para mantener la consistencia de los colores claros */
-          @media (prefers-color-scheme: dark) {
-            :root {
-                --bg-color: #f7f9fc;
-                --text-color: #1f2937;
-                --card-bg: #ffffff;
-                --border-color: #e5e7eb;
-                --table-header-bg: #f3f4f6;
-            }
+          .tableRow:hover {
+            background-color: #f9fafb !important;
           }
-
-          .container {
-            padding: 1.5rem;
-            background-color: var(--bg-color);
-            min-height: 100vh;
-            color: var(--text-color);
-            font-family: 'Inter', sans-serif;
-            transition: background-color 0.3s;
+          .refresh-button:hover:not(:disabled) {
+            opacity: 0.9;
           }
-
-          .title {
-            font-size: 2.25rem;
-            font-weight: 700;
-            color: var(--primary-color);
-            margin-bottom: 1.5rem;
-          }
-
-          .card {
-            background-color: var(--card-bg);
-            border-radius: 0.75rem; /* Ligeramente más redondeado */
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* Sombra más pronunciada */
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-            transition: box-shadow 0.3s;
-          }
-
-          .card:hover {
-             box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-          }
-
-          .subtitle {
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: var(--text-color);
-            margin-bottom: 1rem;
-            border-bottom: 2px solid var(--border-color);
-            padding-bottom: 0.5rem;
-          }
-
-          .alert {
-            padding: 1rem;
-            margin-bottom: 1rem;
-            border-left: 5px solid; /* Borde más grueso */
-            border-radius: 0.375rem;
-            font-size: 0.9rem;
-            font-weight: 500;
-            line-height: 1.4;
-          }
-
-          .alert.error {
-            background-color: var(--error-bg);
-            border-color: var(--error-text);
-            color: var(--error-text);
-          }
-
-          .alert.success {
-            background-color: var(--success-bg);
-            border-color: var(--success-text);
-            color: var(--success-text);
-          }
-
-          .info-panel {
-            background-color: var(--info-bg);
-            border: 1px solid var(--info-border);
-            border-radius: 0.5rem;
-            padding: 1rem;
-            margin-bottom: 1rem;
-            color: var(--info-text);
-          }
-
-          .info-title {
-            font-weight: 700;
-            color: var(--primary-color);
-            margin-bottom: 0.5rem;
-          }
-
-          .info-content {
-            font-size: 0.875rem;
-            line-height: 1.6;
-            color: var(--info-text);
-          }
-
-          .form-group {
-            margin-bottom: 1rem;
-          }
-
-          .form-label {
-            display: block;
-            color: var(--text-color);
-            margin-bottom: 0.4rem;
-            font-weight: 600; /* Más énfasis */
-            font-size: 0.95rem;
-          }
-
-          .form-input, .form-select {
-            display: block;
-            width: 100%;
-            padding: 0.6rem;
-            border-radius: 0.5rem;
-            border: 1px solid var(--border-color);
-            box-shadow: inset 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-            background-color: var(--card-bg);
-            color: var(--text-color);
-            transition: border-color 0.2s, box-shadow 0.2s;
-          }
-
-          .form-select:focus, .form-input:focus {
-            outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.2); /* Sombra de enfoque con color primario */
-          }
-
-          .button {
-            width: 100%;
-            background-color: var(--primary-color);
-            color: #ffffff;
-            padding: 0.75rem 1rem;
-            border-radius: 0.5rem;
-            border: none;
-            cursor: pointer;
-            transition: background-color 0.2s, transform 0.1s;
-            font-weight: 700;
-            margin-top: 1.25rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            letter-spacing: 0.025em;
-          }
-
-          .button:hover:not(:disabled) {
-            background-color: var(--primary-hover-color);
-            transform: translateY(-1px);
-          }
-
-          .button:active:not(:disabled) {
-            transform: translateY(0);
-          }
-
-          .button:disabled {
+          .refresh-button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
           }
-
           .table-container {
             overflow-x: auto;
-            border-radius: 0.5rem;
-            border: 1px solid var(--border-color);
           }
 
-          .table {
-            width: 100%;
-            border-collapse: collapse;
-            min-width: 900px; /* Ancho mínimo para legibilidad */
-          }
+          /* CLASES DE MODO OSCURO ELIMINADAS O ANULADAS PARA FORZAR EL BLANCO */
+          @media (prefers-color-scheme: dark) {
+            /* Forzar el fondo del contenedor a blanco en modo oscuro */
+            .dark-container { background-color: #ffffff !important; }
 
-          .table thead {
-            background-color: var(--table-header-bg);
-            border-bottom: 2px solid var(--border-color);
-          }
-
-          .table th {
-            padding: 0.8rem 1.5rem;
-            text-align: left;
-            font-size: 0.75rem;
-            font-weight: 700;
-            color: #4b5563; /* Gris más oscuro */
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-          }
-
-          .table td {
-            padding: 1rem 1.5rem;
-            border-bottom: 1px solid var(--border-color);
-            font-size: 0.875rem;
-            color: var(--text-color);
-          }
-
-          .table tbody tr:last-child td {
-            border-bottom: none;
-          }
-
-          .table tbody tr:hover {
-            background-color: #f9f9fb; /* Gris muy ligero al pasar el ratón */
-          }
-
-          .status-badge {
-            display: inline-flex;
-            padding: 0.3rem 0.6rem;
-            font-size: 0.75rem;
-            font-weight: 700;
-            border-radius: 9999px;
-            text-transform: capitalize;
-            letter-spacing: 0.05em;
-          }
-
-          .status-badge.realizada {
-            background-color: var(--success-bg);
-            color: var(--success-text);
-          }
-
-          .status-badge.pendiente {
-            background-color: var(--yellow-bg);
-            color: var(--yellow-text);
-          }
-
-          .action-button {
-            padding: 0.5rem;
-            color: var(--primary-color);
-            border: none;
-            background: none;
-            cursor: pointer;
-            transition: color 0.2s, transform 0.1s;
-            border-radius: 0.375rem;
-          }
-
-          .action-button:hover {
-            color: var(--primary-hover-color);
-            background-color: #f0fdfa; /* Teal 50 */
-          }
-
-          .action-button:active {
-            transform: scale(0.95);
+            /* Mantener los colores de texto y componentes en modo oscuro para que sean legibles sobre el fondo blanco */
+            .dark-header { background-color: #f9fafb !important; }
+            .dark-title { color: #1e40af !important; }
+            .dark-subtitle { color: #64748b !important; }
+            .dark-table-container { background-color: white !important; }
+            .dark-table-header { background-color: #f1f5f9 !important; border-color: #e2e8f0 !important; }
+            .dark-header-cell { color: #374151 !important; border-color: #e2e8f0 !important; }
+            .dark-table-row { border-color: #f1f5f9 !important; }
+            .dark-table-row:hover { background-color: #f9fafb !important; }
+            .dark-cell, .dark-cell-name { color: #374151 !important; border-color: #f8fafc !important; }
           }
         `}
       </style>
-      <div className="container">
-        <h1 className="title">Órdenes de Compra</h1>
-
-        {/* Sección para crear una nueva orden */}
-        <div className="card">
-          <h2 className="subtitle">Crear Orden</h2>
-          {error && <div className="alert error">{error}</div>}
-          {success && <div className="alert success">{success}</div>}
-
-          <form onSubmit={handleCreateOrder}>
-            <div className="form-group">
-              <label htmlFor="material-select" className="form-label">1. Seleccionar Material/Producto</label>
-              <select
-                id="material-select"
-                value={selectedMaterial}
-                onChange={(e) => handleMaterialChange(e.target.value)}
-                className="form-select"
-              >
-                <option value="">-- Selecciona un material --</option>
-                {materials.map((material) => (
-                  <option key={material.id} value={material.id}>
-                    {material.name} (ID: {material.id}) - Stock: {material.stock}
-                  </option>
-                ))}
-              </select>
+      <div style={styles.container} className="dark-container">
+        <div style={styles.header} className="dark-header">
+          <div style={styles.titleSection}>
+            <div style={styles.iconContainer}>📊</div>
+            <div>
+              <h1 style={styles.title} className="dark-title">Kardex</h1>
+              <p style={styles.subtitle} className="dark-subtitle">Historial de movimientos de inventario</p>
             </div>
-
-            {selectedMaterialData && (
-              <div className="info-panel">
-                <div className="info-title">Material Seleccionado</div>
-                <div className="info-content">
-                  <strong>Nombre:</strong> {selectedMaterialData.name}<br/>
-                  <strong>Stock actual:</strong> {selectedMaterialData.stock} unidades<br/>
-                  {selectedMaterialData.description && (
-                    <>
-                      <strong>Descripción:</strong> {selectedMaterialData.description}<br/>
-                    </>
-                  )}
-                  {selectedMaterialData.unit && (
-                    <>
-                      <strong>Unidad:</strong> {selectedMaterialData.unit}
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <div className="form-group">
-              <label htmlFor="supplier-select" className="form-label">2. Seleccionar Proveedor</label>
-              <select
-                id="supplier-select"
-                value={selectedSupplier}
-                onChange={(e) => handleSupplierChange(e.target.value)}
-                className="form-select"
-                disabled={!selectedMaterial || availableSuppliers.length === 0}
-              >
-                <option value="">-- Selecciona un proveedor --</option>
-                {availableSuppliers.map((supplier) => (
-                  <option key={supplier.id} value={supplier.id}>
-                    {supplier.name}
-                  </option>
-                ))}
-              </select>
-              {!selectedMaterial && <small style={{display: 'block', marginTop: '0.5rem', color: '#6b7280'}}>Selecciona un material primero para ver los proveedores.</small>}
-              {selectedMaterial && availableSuppliers.length === 0 && <small style={{display: 'block', marginTop: '0.5rem', color: '#dc2626'}}>⚠️ No se encontraron proveedores para este material.</small>}
-            </div>
-
-            {selectedSupplierData && (
-              <div className="info-panel">
-                <div className="info-title">Proveedor Seleccionado</div>
-                <div className="info-content">
-                  <strong>Nombre:</strong> {selectedSupplierData.name}<br/>
-                  {selectedSupplierData.contact_person && (
-                    <>
-                      <strong>Contacto:</strong> {selectedSupplierData.contact_person}<br/>
-                    </>
-                  )}
-                  {selectedSupplierData.phone && (
-                    <>
-                      <strong>Teléfono:</strong> {selectedSupplierData.phone}<br/>
-                    </>
-                  )}
-                  {selectedSupplierData.email && (
-                    <>
-                      <strong>Email:</strong> {selectedSupplierData.email}<br/>
-                    </>
-                  )}
-                  {selectedSupplierData.address && (
-                    <>
-                      <strong>Dirección:</strong> {selectedSupplierData.address}
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <div className="form-group">
-              <label htmlFor="quantity-input" className="form-label">3. Cantidad</label>
-              <input
-                id="quantity-input"
-                type="number"
-                min="1"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                className="form-input"
-                placeholder="Ingresa la cantidad a solicitar"
-                disabled={!selectedSupplier}
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="button"
-              disabled={!selectedMaterial || !selectedSupplier || !quantity}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: '8px'}}><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-              Crear Orden de Compra
-            </button>
-          </form>
+          </div>
+          <button
+            onClick={fetchCardex}
+            style={styles.refreshButton}
+            className="refresh-button"
+            disabled={isLoading}
+          >
+            🔄 Actualizar
+          </button>
         </div>
 
-        {/* Historial de Órdenes */}
-        <div className="card">
-          <h2 className="subtitle">Historial de Órdenes</h2>
-          <div className="table-container">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Fecha</th>
-                  <th>Proveedor</th>
-                  <th>Material</th>
-                  <th>Cantidad</th>
-                  <th>Estado</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.length > 0 ? (
-                  orders.map((order) => {
-                    const material = materials.find(m => m.id === order.material_id);
-                    return (
-                      <tr key={order.id}>
-                        <td>{order.id}</td>
-                        <td>{new Date(order.date).toLocaleDateString()}</td>
-                        <td>{order.supplier_name || 'Desconocido'}</td>
-                        <td>
-                          {material ? material.name : `ID: ${order.material_id}`}
-                        </td>
-                        <td>{order.quantity}</td>
-                        <td>
-                          {/* El status ahora está garantizado en minúsculas */}
-                          <span className={`status-badge ${order.status}`}>
-                            {order.status}
-                          </span>
-                        </td>
-                        <td>
-                          {order.status === 'pendiente' && (
-                            <button
-                              onClick={() => handleCompleteOrder(order.id)}
-                              className="action-button"
-                              title="Marcar como recibida y actualizar stock"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-check-circle"><path d="M22 11.08V12a10 10 0 1 1-5.93-8.8"/><path d="M22 4L12 14.01l-3-3"/></svg>
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan="7" style={{ textAlign: "center", color: "#6b7280" }}>
-                      No hay órdenes de compra registradas.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+        {error && (
+          <div style={styles.errorContainer}>
+            <div style={styles.errorIcon}>⚠️</div>
+            <p style={styles.errorText}>{error}</p>
+          </div>
+        )}
+
+        <div style={styles.tableContainer} className="table-container dark-table-container">
+          <div style={styles.tableWrapper}>
+            <div style={styles.tableHeader} className="dark-table-header">
+              <div style={styles.headerCell} className="dark-header-cell">Fecha</div>
+              <div style={styles.headerCell} className="dark-header-cell">Material/Producto</div>
+              <div style={styles.headerCell} className="dark-header-cell">Movimiento</div>
+              <div style={styles.headerCell} className="dark-header-cell">Cantidad</div>
+              <div style={styles.headerCell} className="dark-header-cell">Stock Anterior</div>
+              <div style={styles.headerCell} className="dark-header-cell">Stock Nuevo</div>
+              <div style={styles.headerCell} className="dark-header-cell">Usuario</div>
+              <div style={styles.headerCell} className="dark-header-cell">Observaciones</div>
+            </div>
+
+            {records.map((record, index) => {
+              const itemDetails = getItemDetails(record); // Obtener detalles
+              const movementStyle = getMovementStyle(record.movement_type);
+
+              const isDark = typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches;
+              const movementClassName = isDark ? `dark-movement-${record.movement_type?.toLowerCase().includes('entrada') || record.movement_type?.toLowerCase().includes('compra') ? 'in' : record.movement_type?.toLowerCase().includes('salida') || record.movement_type?.toLowerCase().includes('venta') ? 'out' : 'adjust'}` : '';
+              const itemClassName = isDark ? `dark-item-${itemDetails.type}-badge` : '';
+              const rowClassName = `tableRow dark-table-row ${index % 2 === 0 ? '' : 'bg-gray-50'}`; // Añadimos clase para hover
+
+              return (
+                <div key={record.id || index} style={styles.tableRow} className={rowClassName}>
+                  <div style={styles.cell} className="dark-cell">{formatDate(record.date)}</div>
+                  <div style={styles.cellName} className="dark-cell-name">
+                    <span
+                      style={{
+                        ...styles.itemBadge,
+                        ...getItemBadgeStyle(itemDetails.type),
+                      }}
+                      className={itemClassName}
+                    >
+                      {itemDetails.type === 'material' ? 'M' : itemDetails.type === 'product' ? 'P' : '?' }
+                    </span>
+                    <span style={{ marginLeft: '8px' }}>{itemDetails.name}</span>
+                  </div>
+                  <div style={styles.cell} className="dark-cell">
+                    <span
+                      style={{
+                        ...styles.movementBadge,
+                        ...movementStyle,
+                      }}
+                      className={movementClassName}
+                    >
+                      {getMovementIcon(record.movement_type)} {getMovementLabel(record.movement_type)}
+                    </span>
+                  </div>
+                  {/* ===================== MODIFICACIÓN AQUÍ ===================== */}
+                  <div style={{ ...styles.cell, fontWeight: '700' }} className="dark-cell">
+                    {(() => {
+                      const movementType = record.movement_type?.toLowerCase();
+                      const quantity = record.quantity;
+
+                      if (['salida', 'venta', 'consumo'].includes(movementType)) {
+                        // Para salidas, siempre mostrar signo negativo
+                        return `-${Math.abs(quantity)}`;
+                      }
+
+                      // Para el resto (entradas, ajustes), mostrar con signo + si es positivo o cero
+                      return quantity >= 0 ? `+${quantity}` : quantity;
+                    })()}
+                  </div>
+                  {/* ===================== FIN DE LA MODIFICACIÓN ===================== */}
+                  <div style={styles.cell} className="dark-cell">{record.stock_anterior || 0}</div>
+                  <div style={styles.cell} className="dark-cell">{record.stock_nuevo || 0}</div>
+                  <div style={styles.cell} className="dark-cell">{record.username || record.user_id || '-'}</div>
+                  <div style={styles.cell} className="dark-cell">{record.observaciones || '-'}</div>
+                </div>
+              );
+            })}
           </div>
         </div>
+
+        {records.length === 0 && !error && !isLoading && (
+          <div style={styles.emptyState}>
+            <div style={styles.emptyIcon}>📦</div>
+            <h3 style={styles.emptyTitle}>No hay movimientos registrados</h3>
+            <p style={styles.emptyText}>
+              Aún no se han realizado movimientos de inventario.
+            </p>
+          </div>
+        )}
       </div>
     </>
   );
-};
+}
 
-export default Purchases;
+const styles = {
+  // Estilos Base
+  container: {
+    padding: "24px",
+    maxWidth: "1400px",
+    margin: "0 auto",
+    // MODIFICACIÓN CLAVE: Fondo blanco
+    backgroundColor: "#ffffff",
+    minHeight: "100vh",
+    fontFamily: "'Inter','Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+    transition: 'background-color 0.3s',
+  },
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "32px",
+    backgroundColor: "white",
+    padding: "20px",
+    borderRadius: "12px",
+    boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
+    transition: 'background-color 0.3s, box-shadow 0.3s',
+  },
+  titleSection: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px"
+  },
+  iconContainer: {
+    fontSize: "28px"
+  },
+  title: {
+    margin: 0,
+    fontSize: "24px",
+    fontWeight: "700",
+    color: "#1e40af", // blue-700
+    transition: 'color 0.3s',
+  },
+  subtitle: {
+    margin: 0,
+    fontSize: "14px",
+    color: "#64748b", // slate-500
+    transition: 'color 0.3s',
+  },
+  refreshButton: {
+    backgroundColor: "#2563eb", // blue-600
+    color: "white",
+    border: "none",
+    borderRadius: "8px",
+    padding: "10px 16px",
+    cursor: "pointer",
+    fontWeight: "600",
+    fontSize: "14px",
+    transition: "background-color 0.2s, opacity 0.2s ease",
+  },
+  errorContainer: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    backgroundColor: "#fef2f2", // red-50
+    border: "1px solid #fecaca", // red-200
+    borderRadius: "10px",
+    padding: "12px",
+    marginBottom: "20px",
+  },
+  errorIcon: {
+    fontSize: "18px",
+    color: "#ef4444" // red-500
+  },
+  errorText: {
+    color: "#dc2626", // red-600
+    margin: 0,
+    fontSize: "14px"
+  },
+
+  // Estilos de Tabla
+  tableContainer: {
+    backgroundColor: "white",
+    borderRadius: "12px",
+    boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
+    overflow: "hidden",
+    transition: 'background-color 0.3s, box-shadow 0.3s',
+  },
+  tableWrapper: {
+    display: "flex",
+    flexDirection: "column"
+  },
+  tableHeader: {
+    display: "grid",
+    gridTemplateColumns: "160px 200px 140px 100px 120px 120px 150px 200px", // 8 columnas
+    backgroundColor: "#f1f5f9", // slate-100
+    borderBottom: "1px solid #e2e8f0", // slate-200
+    transition: 'background-color 0.3s, border-color 0.3s',
+  },
+  headerCell: {
+    padding: "12px",
+    fontWeight: "600",
+    color: "#374151", // slate-700
+    borderRight: "1px solid #e2e8f0",
+    fontSize: "13px",
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+    transition: 'color 0.3s, border-color 0.3s',
+  },
+  tableRow: {
+    display: "grid",
+    gridTemplateColumns: "160px 200px 140px 100px 120px 120px 150px 200px",
+    borderBottom: "1px solid #f1f5f9",
+    transition: "background-color 0.1s ease, border-color 0.3s",
+  },
+  cell: {
+    padding: "12px",
+    fontSize: "14px",
+    color: "#374151",
+    borderRight: "1px solid #f8fafc",
+    alignItems: "center",
+    display: "flex",
+    transition: 'color 0.3s, border-color 0.3s',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
+  cellName: {
+    padding: "12px",
+    fontWeight: "600",
+    color: "#1e293b", // slate-800
+    borderRight: "1px solid #f8fafc",
+    display: 'flex',
+    alignItems: 'center',
+    transition: 'color 0.3s, border-color 0.3s',
+  },
+
+  // Insignias de Material/Producto
+  itemBadge: {
+    padding: "2px 6px",
+    borderRadius: "4px",
+    fontSize: "11px",
+    fontWeight: "700",
+    textTransform: "uppercase",
+    width: '18px',
+    textAlign: 'center',
+    transition: 'background-color 0.3s, color 0.3s',
+  },
+  itemMaterialBadge: {
+    backgroundColor: "#dbeafe", // blue-100
+    color: "#1e40af", // blue-700
+  },
+  itemProductBadge: {
+    backgroundColor: "#d1fae5", // green-100
+    color: "#059669", // green-600
+  },
+
+  // Insignias de Movimiento
+  movementBadge: {
+    padding: "4px 8px",
+    borderRadius: "6px",
+    fontSize: "12px",
+    fontWeight: "600",
+    whiteSpace: "nowrap",
+    transition: 'background-color 0.3s, color 0.3s',
+  },
+  movementIn: {
+    backgroundColor: "#d1fae5", // green-100
+    color: "#059669" // green-600
+  },
+  movementOut: {
+    backgroundColor: "#fee2e2", // red-100
+    color: "#dc2626" // red-600
+  },
+  movementAdjust: {
+    backgroundColor: "#fef9c3", // yellow-100
+    color: "#d97706" // amber-700
+  },
+  movementDefault: {
+    backgroundColor: "#f3f4f6", // gray-100
+    color: "#6b7280" // gray-500
+  },
+
+  // Estado de Carga y Vacío
+  loadingContainer: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: "300px",
+    gap: "12px",
+  },
+  spinner: {
+    width: "40px",
+    height: "40px",
+    border: "4px solid #e2e8f0",
+    borderTop: "4px solid #2563eb",
+    borderRadius: "50%",
+    animation: "spin 1s linear infinite",
+  },
+  loadingText: {
+    fontSize: "16px",
+    color: "#64748b"
+  },
+  emptyState: {
+    textAlign: "center",
+    padding: "60px 20px",
+    backgroundColor: "white",
+    borderRadius: "12px",
+    marginTop: "20px",
+    boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
+  },
+  emptyIcon: {
+    fontSize: "48px",
+    marginBottom: "12px"
+  },
+  emptyTitle: {
+    fontSize: "18px",
+    fontWeight: "600",
+    color: "#374151",
+    margin: "0 0 8px 0",
+  },
+  emptyText: {
+    fontSize: "14px",
+    color: "#6b7280",
+    margin: 0,
+  },
+};
