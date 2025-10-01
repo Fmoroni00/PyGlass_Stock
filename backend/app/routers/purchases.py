@@ -122,3 +122,37 @@ def complete_order(
     order.supplier_name = supplier.name if supplier else f"Proveedor ID: {order.supplier_id}"
 
     return order
+
+# 🔹 Cancelar una orden de compra
+@router.put("/orders/{order_id}/cancel", response_model=schemas.PurchaseOrderOut)
+def cancel_order(
+        order_id: int,
+        db: Session = Depends(get_db),
+        current_user: models.User = Depends(get_current_user)
+):
+    order_query = db.query(models.PurchaseOrder).filter(
+        models.PurchaseOrder.id == order_id,
+        models.PurchaseOrder.user_id == current_user.id
+    )
+    order = order_query.first()
+
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Orden no encontrada")
+
+    if order.status.lower() != "pendiente":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Solo se pueden cancelar órdenes pendientes"
+        )
+
+    # Cambiar estado a cancelada (NO afecta el stock)
+    order.status = "cancelada"
+
+    db.commit()
+    db.refresh(order)
+
+    # Agregar nombre del proveedor para la respuesta
+    supplier = db.query(models.Supplier).filter(models.Supplier.id == order.supplier_id).first()
+    order.supplier_name = supplier.name if supplier else f"Proveedor ID: {order.supplier_id}"
+
+    return order

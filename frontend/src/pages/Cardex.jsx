@@ -25,7 +25,7 @@ const handleResponse = async (response) => {
     let errorMessage = "Error en la petición";
     try {
       const error = await response.json();
-      console.log("Error response:", error); // Para debugging
+      console.log("Error response:", error);
 
       if (typeof error === 'string') {
         errorMessage = error;
@@ -33,7 +33,6 @@ const handleResponse = async (response) => {
         if (typeof error.detail === 'string') {
           errorMessage = error.detail;
         } else if (Array.isArray(error.detail)) {
-          // Si es un error de validación de Pydantic, concatenar mensajes
           errorMessage = error.detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ');
         } else {
           errorMessage = JSON.stringify(error.detail);
@@ -53,16 +52,11 @@ const handleResponse = async (response) => {
 
 const api = {
   getKardex: () => {
-    // CORRECCIÓN: Usar la constante API_URL
     return fetch(`${API_URL}/kardex/`, {
       headers: getHeaders(),
     }).then(handleResponse);
   },
 };
-
-// =========================================================
-// COMPONENTE PRINCIPAL
-// =========================================================
 
 export default function Cardex() {
   const [records, setRecords] = useState([]);
@@ -76,16 +70,13 @@ export default function Cardex() {
   const fetchCardex = async () => {
     try {
       setIsLoading(true);
-      // Opcional: Mostrar la URL que se está usando para debug
       console.log(`Fetching Kardex from: ${API_URL}/kardex/`);
 
       const res = await api.getKardex();
-      // Asegurar que 'res' sea un array.
       setRecords(Array.isArray(res) ? res : []);
       setError(null);
     } catch (err) {
       console.error("Error fetching kardex:", err);
-      // Extraemos el mensaje de error de la instancia Error
       setError("Error al cargar movimientos de inventario: " + err.message);
     } finally {
       setIsLoading(false);
@@ -94,7 +85,6 @@ export default function Cardex() {
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
-    // Asegurar que la fecha sea válida antes de formatear
     if (isNaN(date)) {
         return "Fecha inválida";
     }
@@ -104,12 +94,11 @@ export default function Cardex() {
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
-      second: "2-digit" // Añadir segundos para mayor precisión
+      second: "2-digit"
     });
   };
 
   const getItemDetails = (record) => {
-    // Prioriza material
     if (record.material_id || record.material_name) {
       return {
         name: record.material_name || `Material ID: ${record.material_id}`,
@@ -117,7 +106,6 @@ export default function Cardex() {
         id: record.material_id,
       };
     }
-    // Si no es material, busca producto
     if (record.product_id || record.product_name) {
       return {
         name: record.product_name || `Producto ID: ${record.product_id}`,
@@ -125,7 +113,6 @@ export default function Cardex() {
         id: record.product_id,
       };
     }
-    // Si no hay ninguno
     return {
       name: 'Ítem Desconocido',
       type: 'unknown',
@@ -140,7 +127,7 @@ export default function Cardex() {
           case 'product':
               return styles.itemProductBadge;
           default:
-              return styles.movementDefault; // Estilo por defecto
+              return styles.movementDefault;
       }
   };
 
@@ -198,6 +185,25 @@ export default function Cardex() {
     }
   };
 
+  const formatQuantity = (record) => {
+    const movementType = record.movement_type?.toLowerCase() || '';
+    const quantity = Math.abs(record.quantity);
+
+    if (movementType.includes('salida') ||
+        movementType.includes('venta') ||
+        movementType.includes('consumo')) {
+      return `-${quantity}`;
+    }
+
+    if (movementType.includes('entrada') ||
+        movementType.includes('compra') ||
+        movementType.includes('ingreso')) {
+      return `+${quantity}`;
+    }
+
+    return record.quantity >= 0 ? `+${quantity}` : `-${quantity}`;
+  };
+
   if (isLoading) {
     return (
       <div style={styles.container}>
@@ -231,12 +237,8 @@ export default function Cardex() {
             overflow-x: auto;
           }
 
-          /* CLASES DE MODO OSCURO ELIMINADAS O ANULADAS PARA FORZAR EL BLANCO */
           @media (prefers-color-scheme: dark) {
-            /* Forzar el fondo del contenedor a blanco en modo oscuro */
             .dark-container { background-color: #ffffff !important; }
-
-            /* Mantener los colores de texto y componentes en modo oscuro para que sean legibles sobre el fondo blanco */
             .dark-header { background-color: #f9fafb !important; }
             .dark-title { color: #1e40af !important; }
             .dark-subtitle { color: #64748b !important; }
@@ -289,26 +291,23 @@ export default function Cardex() {
             </div>
 
             {records.map((record, index) => {
-              const itemDetails = getItemDetails(record); // Obtener detalles
+              const itemDetails = getItemDetails(record);
               const movementStyle = getMovementStyle(record.movement_type);
-
-              const isDark = typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches;
-              const movementClassName = isDark ? `dark-movement-${record.movement_type?.toLowerCase().includes('entrada') || record.movement_type?.toLowerCase().includes('compra') ? 'in' : record.movement_type?.toLowerCase().includes('salida') || record.movement_type?.toLowerCase().includes('venta') ? 'out' : 'adjust'}` : '';
-              const itemClassName = isDark ? `dark-item-${itemDetails.type}-badge` : '';
-              const rowClassName = `tableRow dark-table-row ${index % 2 === 0 ? '' : 'bg-gray-50'}`; // Añadimos clase para hover
+              const rowClassName = `tableRow dark-table-row ${index % 2 === 0 ? '' : 'bg-gray-50'}`;
 
               return (
                 <div key={record.id || index} style={styles.tableRow} className={rowClassName}>
-                  <div style={styles.cell} className="dark-cell">{formatDate(record.date)}</div>
+                  <div style={styles.cell} className="dark-cell">
+                    {formatDate(record.date)}
+                  </div>
                   <div style={styles.cellName} className="dark-cell-name">
                     <span
                       style={{
                         ...styles.itemBadge,
                         ...getItemBadgeStyle(itemDetails.type),
                       }}
-                      className={itemClassName}
                     >
-                      {itemDetails.type === 'material' ? 'M' : itemDetails.type === 'product' ? 'P' : '?' }
+                      {itemDetails.type === 'material' ? 'M' : itemDetails.type === 'product' ? 'P' : '?'}
                     </span>
                     <span style={{ marginLeft: '8px' }}>{itemDetails.name}</span>
                   </div>
@@ -318,31 +317,25 @@ export default function Cardex() {
                         ...styles.movementBadge,
                         ...movementStyle,
                       }}
-                      className={movementClassName}
                     >
                       {getMovementIcon(record.movement_type)} {getMovementLabel(record.movement_type)}
                     </span>
                   </div>
-                  {/* ===================== MODIFICACIÓN AQUÍ ===================== */}
                   <div style={{ ...styles.cell, fontWeight: '700' }} className="dark-cell">
-                    {(() => {
-                      const movementType = record.movement_type?.toLowerCase();
-                      const quantity = record.quantity;
-
-                      if (['salida', 'venta', 'consumo'].includes(movementType)) {
-                        // Para salidas, siempre mostrar signo negativo
-                        return `-${Math.abs(quantity)}`;
-                      }
-
-                      // Para el resto (entradas, ajustes), mostrar con signo + si es positivo o cero
-                      return quantity >= 0 ? `+${quantity}` : quantity;
-                    })()}
+                    {formatQuantity(record)}
                   </div>
-                  {/* ===================== FIN DE LA MODIFICACIÓN ===================== */}
-                  <div style={styles.cell} className="dark-cell">{record.stock_anterior || 0}</div>
-                  <div style={styles.cell} className="dark-cell">{record.stock_nuevo || 0}</div>
-                  <div style={styles.cell} className="dark-cell">{record.username || record.user_id || '-'}</div>
-                  <div style={styles.cell} className="dark-cell">{record.observaciones || '-'}</div>
+                  <div style={styles.cell} className="dark-cell">
+                    {record.stock_anterior || 0}
+                  </div>
+                  <div style={styles.cell} className="dark-cell">
+                    {record.stock_nuevo || 0}
+                  </div>
+                  <div style={styles.cell} className="dark-cell">
+                    {record.username || record.user_id || '-'}
+                  </div>
+                  <div style={styles.cell} className="dark-cell">
+                    {record.observaciones || '-'}
+                  </div>
                 </div>
               );
             })}
@@ -364,12 +357,10 @@ export default function Cardex() {
 }
 
 const styles = {
-  // Estilos Base
   container: {
     padding: "24px",
     maxWidth: "1400px",
     margin: "0 auto",
-    // MODIFICACIÓN CLAVE: Fondo blanco
     backgroundColor: "#ffffff",
     minHeight: "100vh",
     fontFamily: "'Inter','Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
@@ -398,17 +389,17 @@ const styles = {
     margin: 0,
     fontSize: "24px",
     fontWeight: "700",
-    color: "#1e40af", // blue-700
+    color: "#1e40af",
     transition: 'color 0.3s',
   },
   subtitle: {
     margin: 0,
     fontSize: "14px",
-    color: "#64748b", // slate-500
+    color: "#64748b",
     transition: 'color 0.3s',
   },
   refreshButton: {
-    backgroundColor: "#2563eb", // blue-600
+    backgroundColor: "#2563eb",
     color: "white",
     border: "none",
     borderRadius: "8px",
@@ -422,23 +413,21 @@ const styles = {
     display: "flex",
     alignItems: "center",
     gap: "10px",
-    backgroundColor: "#fef2f2", // red-50
-    border: "1px solid #fecaca", // red-200
+    backgroundColor: "#fef2f2",
+    border: "1px solid #fecaca",
     borderRadius: "10px",
     padding: "12px",
     marginBottom: "20px",
   },
   errorIcon: {
     fontSize: "18px",
-    color: "#ef4444" // red-500
+    color: "#ef4444"
   },
   errorText: {
-    color: "#dc2626", // red-600
+    color: "#dc2626",
     margin: 0,
     fontSize: "14px"
   },
-
-  // Estilos de Tabla
   tableContainer: {
     backgroundColor: "white",
     borderRadius: "12px",
@@ -452,15 +441,15 @@ const styles = {
   },
   tableHeader: {
     display: "grid",
-    gridTemplateColumns: "160px 200px 140px 100px 120px 120px 150px 200px", // 8 columnas
-    backgroundColor: "#f1f5f9", // slate-100
-    borderBottom: "1px solid #e2e8f0", // slate-200
+    gridTemplateColumns: "160px 200px 140px 100px 120px 120px 150px 200px",
+    backgroundColor: "#f1f5f9",
+    borderBottom: "1px solid #e2e8f0",
     transition: 'background-color 0.3s, border-color 0.3s',
   },
   headerCell: {
     padding: "12px",
     fontWeight: "600",
-    color: "#374151", // slate-700
+    color: "#374151",
     borderRight: "1px solid #e2e8f0",
     fontSize: "13px",
     textTransform: "uppercase",
@@ -487,14 +476,12 @@ const styles = {
   cellName: {
     padding: "12px",
     fontWeight: "600",
-    color: "#1e293b", // slate-800
+    color: "#1e293b",
     borderRight: "1px solid #f8fafc",
     display: 'flex',
     alignItems: 'center',
     transition: 'color 0.3s, border-color 0.3s',
   },
-
-  // Insignias de Material/Producto
   itemBadge: {
     padding: "2px 6px",
     borderRadius: "4px",
@@ -506,15 +493,13 @@ const styles = {
     transition: 'background-color 0.3s, color 0.3s',
   },
   itemMaterialBadge: {
-    backgroundColor: "#dbeafe", // blue-100
-    color: "#1e40af", // blue-700
+    backgroundColor: "#dbeafe",
+    color: "#1e40af",
   },
   itemProductBadge: {
-    backgroundColor: "#d1fae5", // green-100
-    color: "#059669", // green-600
+    backgroundColor: "#d1fae5",
+    color: "#059669",
   },
-
-  // Insignias de Movimiento
   movementBadge: {
     padding: "4px 8px",
     borderRadius: "6px",
@@ -524,23 +509,21 @@ const styles = {
     transition: 'background-color 0.3s, color 0.3s',
   },
   movementIn: {
-    backgroundColor: "#d1fae5", // green-100
-    color: "#059669" // green-600
+    backgroundColor: "#d1fae5",
+    color: "#059669"
   },
   movementOut: {
-    backgroundColor: "#fee2e2", // red-100
-    color: "#dc2626" // red-600
+    backgroundColor: "#fee2e2",
+    color: "#dc2626"
   },
   movementAdjust: {
-    backgroundColor: "#fef9c3", // yellow-100
-    color: "#d97706" // amber-700
+    backgroundColor: "#fef9c3",
+    color: "#d97706"
   },
   movementDefault: {
-    backgroundColor: "#f3f4f6", // gray-100
-    color: "#6b7280" // gray-500
+    backgroundColor: "#f3f4f6",
+    color: "#6b7280"
   },
-
-  // Estado de Carga y Vacío
   loadingContainer: {
     display: "flex",
     flexDirection: "column",

@@ -6,17 +6,54 @@ import Purchases from "./pages/Purchases";
 import Cardex from "./pages/Cardex";
 import { setToken } from "./services/api";
 
+const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
 export default function App() {
   const [logged, setLogged] = useState(false);
   const [page, setPage] = useState("materials");
-  const [showInventoryMenu, setShowInventoryMenu] = useState(false);
+  const [isValidating, setIsValidating] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      setToken(token);
-      setLogged(true);
-    }
+    const validateToken = async () => {
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        setIsValidating(false);
+        setLogged(false);
+        return;
+      }
+
+      try {
+        setToken(token);
+
+        // Intenta hacer una petición a materials para validar el token
+        const response = await fetch(`${API_URL}/materials/`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          setLogged(true);
+        } else {
+          // Token inválido o expirado
+          localStorage.removeItem("token");
+          setToken(null);
+          setLogged(false);
+        }
+      } catch (error) {
+        // Error de red o servidor
+        console.error("Error validating token:", error);
+        localStorage.removeItem("token");
+        setToken(null);
+        setLogged(false);
+      } finally {
+        setIsValidating(false);
+      }
+    };
+
+    validateToken();
   }, []);
 
   const handleLogout = () => {
@@ -26,7 +63,6 @@ export default function App() {
     setPage("materials");
   };
 
-  // 🎯 Estilos base de botones
   const baseButtonStyle = {
     padding: '10px 16px',
     borderRadius: '8px',
@@ -49,7 +85,39 @@ export default function App() {
     fontWeight: isActive ? '600' : '500'
   });
 
-  // 🔐 Si NO está logueado → mostrar login
+  // Pantalla de carga mientras valida el token
+  if (isValidating) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #f8fafc, #e0f2fe, #cffafe)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: "'Inter','Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: '48px',
+            height: '48px',
+            border: '4px solid rgba(59, 130, 246, 0.2)',
+            borderTop: '4px solid #3b82f6',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 16px'
+          }}></div>
+          <p style={{ color: '#64748b', fontSize: '14px' }}>Validando sesión...</p>
+          <style>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
+        </div>
+      </div>
+    );
+  }
+
   if (!logged) {
     return (
       <div style={{
@@ -106,14 +174,12 @@ export default function App() {
     );
   }
 
-  // ✅ Si está logueado → mostrar menú + contenido
   return (
     <div style={{
       minHeight: '100vh',
       background: 'linear-gradient(135deg, #f8fafc, #e0f2fe, #cffafe)',
       fontFamily: "'Inter','Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
     }}>
-      {/* 🔹 Header */}
       <header style={{
         backgroundColor: 'rgba(255, 255, 255, 0.8)',
         backdropFilter: 'blur(10px)',
@@ -135,7 +201,6 @@ export default function App() {
             flexWrap: 'wrap',
             gap: '16px'
           }}>
-            {/* Logo */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{
                 width: '40px',
@@ -167,7 +232,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Navegación */}
             <nav style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <button style={getButtonStyle(page === 'materials')} onClick={() => setPage("materials")}>🧱 Materias Primas</button>
               <button style={getButtonStyle(page === 'products')} onClick={() => setPage("products")}>📋 Productos</button>
@@ -190,7 +254,6 @@ export default function App() {
         </div>
       </header>
 
-      {/* 🔹 Main Content */}
       <main style={{
         maxWidth: '1200px',
         margin: '0 auto',
