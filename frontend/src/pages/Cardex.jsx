@@ -301,7 +301,6 @@ export default function Cardex() {
                 <div key={record.id || index} style={styles.tableRow} className={rowClassName}>
                   <div style={styles.cell} className="dark-cell">{formatDate(record.date)}</div>
                   <div style={styles.cellName} className="dark-cell-name">
-                    {/* Renderizado con el tipo de ítem (MODIFICADO) */}
                     <span
                       style={{
                         ...styles.itemBadge,
@@ -324,9 +323,22 @@ export default function Cardex() {
                       {getMovementIcon(record.movement_type)} {getMovementLabel(record.movement_type)}
                     </span>
                   </div>
+                  {/* ===================== MODIFICACIÓN AQUÍ ===================== */}
                   <div style={{ ...styles.cell, fontWeight: '700' }} className="dark-cell">
-                    {record.quantity > 0 ? `+${record.quantity}` : record.quantity}
+                    {(() => {
+                      const movementType = record.movement_type?.toLowerCase();
+                      const quantity = record.quantity;
+
+                      if (['salida', 'venta', 'consumo'].includes(movementType)) {
+                        // Para salidas, siempre mostrar signo negativo
+                        return `-${Math.abs(quantity)}`;
+                      }
+
+                      // Para el resto (entradas, ajustes), mostrar con signo + si es positivo o cero
+                      return quantity >= 0 ? `+${quantity}` : quantity;
+                    })()}
                   </div>
+                  {/* ===================== FIN DE LA MODIFICACIÓN ===================== */}
                   <div style={styles.cell} className="dark-cell">{record.stock_anterior || 0}</div>
                   <div style={styles.cell} className="dark-cell">{record.stock_nuevo || 0}</div>
                   <div style={styles.cell} className="dark-cell">{record.username || record.user_id || '-'}</div>
