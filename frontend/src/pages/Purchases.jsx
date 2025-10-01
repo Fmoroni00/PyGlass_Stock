@@ -1,89 +1,148 @@
 import React, { useState, useEffect } from "react";
 
-// Inlined API logic to make the file self-contained
-const getToken = () => {
+// =========================================================
+// LÓGICA DE API CENTRALIZADA CON SOPORTE PARA ENTORNO
+// =========================================================
+
+/**
+ * 1. URL de la API
+ * **CORRECCIÓN:** Se fuerza el uso de la URL de producción (Render)
+ * para asegurar la conectividad en el entorno de previsualización (Canvas),
+ * ya que el servidor local (127.0.0.1) no está disponible aquí.
+ */
+const API_URL = "https://pyglass-stock.onrender.com";
+
+// Variable global mutable para el token
+let token = null;
+
+/**
+ * Guardar token en memoria y en localStorage
+ */
+function setToken(newToken) {
+  token = newToken;
   if (typeof window !== 'undefined') {
-    return localStorage.getItem("token");
-  }
-  return null;
-};
-
-const getHeaders = () => {
-  const headers = {
-    "Content-Type": "application/json",
-  };
-  const token = getToken();
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-  return headers;
-};
-
-const handleResponse = async (response) => {
-  if (!response.ok) {
-    let errorMessage = "Error en la petición";
-    try {
-      const error = await response.json();
-      console.log("Error response:", error); // Para debugging
-
-      if (typeof error === 'string') {
-        errorMessage = error;
-      } else if (error.detail) {
-        if (typeof error.detail === 'string') {
-          errorMessage = error.detail;
-        } else if (Array.isArray(error.detail)) {
-          errorMessage = error.detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ');
-        } else {
-          errorMessage = JSON.stringify(error.detail);
-        }
-      } else if (error.message) {
-        errorMessage = error.message;
-      } else {
-        errorMessage = JSON.stringify(error);
-      }
-    } catch (e) {
-      errorMessage = `Error ${response.status}: ${response.statusText}`;
+    if (newToken) {
+      localStorage.setItem("token", newToken);
+    } else {
+      localStorage.removeItem("token");
     }
+  }
+}
+
+/**
+ * Cargar token desde memoria o localStorage
+ */
+function loadToken() {
+  if (!token) {
+    // Verificar si estamos en un entorno de navegador
+    if (typeof window !== 'undefined') {
+        token = localStorage.getItem("token");
+    }
+  }
+  return token;
+}
+
+/**
+ * Request genérico con autenticación y manejo de errores
+ */
+async function request(endpoint, method = "GET", body = null) {
+
+  // USAMOS la API_URL que ahora apunta directamente a Render.
+  const baseUrl = API_URL;
+
+  const options = {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+    },
+  };
+
+  const authToken = loadToken();
+  if (authToken) {
+    options.headers["Authorization"] = `Bearer ${authToken}`;
+  }
+
+  if (body) {
+    options.body = JSON.stringify(body);
+  }
+
+  // Se añaden reintentos con backoff exponencial para mejorar la resiliencia contra fallos de red
+  // o problemas temporales de Render (hot start/sleep).
+  const MAX_RETRIES = 3;
+  let res;
+
+  for (let i = 0; i < MAX_RETRIES; i++) {
+    try {
+      res = await fetch(`${baseUrl}${endpoint}`, options);
+      if (res.ok || res.status < 500) {
+        break; // Éxito o error manejable
+      }
+    } catch (error) {
+      // Ignorar el error de red en el reintento si no es el último intento
+      if (i === MAX_RETRIES - 1) {
+        throw new Error(`Error de red tras ${MAX_RETRIES} intentos: ${error.message}`);
+      }
+    }
+    // Espera exponencial: 500ms, 1000ms, 2000ms...
+    await new Promise(resolve => setTimeout(resolve, 500 * (2 ** i)));
+  }
+
+  if (!res || !res.ok) {
+    // Si res es null (todos los fetch fallaron por error de red) o no es ok
+    if (!res) throw new Error("Fallo de conexión persistente con el servidor.");
+
+    // Intenta obtener el error detallado del JSON
+    const errorData = await res.json().catch(() => ({}));
+    let errorMessage = `Error ${res.status}: `;
+
+    if (errorData && errorData.detail) {
+        if (typeof errorData.detail === 'string') {
+            errorMessage += errorData.detail;
+        } else if (Array.isArray(errorData.detail)) {
+            // Manejar errores de validación de Pydantic/FastAPI
+            errorMessage += errorData.detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ');
+        } else {
+            errorMessage += "Ocurrió un error desconocido en el servidor.";
+        }
+    } else if (res.statusText) {
+        errorMessage += res.statusText;
+    } else {
+        errorMessage += "Error de red o servidor desconocido.";
+    }
+
+    // Loguear el error para debugging
+    console.error("API Error Details:", errorData);
     throw new Error(errorMessage);
   }
-  return response.json();
+
+  // Si la respuesta es 204 No Content (DELETE, PUT), no intentamos parsear JSON
+  if (res.status === 204) {
+      return {};
+  }
+
+  return res.json();
+}
+
+/**
+ * Objeto API con todos los endpoints relevantes.
+ */
+const api = {
+  // 📦 Materiales
+  getMaterials: () => request("/materials/"),
+
+  // 📝 Órdenes de Compra (Métodos necesarios para este componente)
+  getOrders: () => request("/purchases/orders"),
+  createOrder: (data) => request("/purchases/orders", "POST", data),
+  completeOrder: (orderId) => request(`/purchases/orders/${orderId}/complete`, "PUT"),
+
+  // 🚛 Proveedores
+  getSuppliers: () => request("/suppliers/"),
+  getMaterialSuppliers: (materialId) => request(`/suppliers/by-material/${materialId}`),
 };
 
-const api = {
-  getMaterials: () => {
-    return fetch("http://127.0.0.1:8000/materials/", {
-      headers: getHeaders(),
-    }).then(handleResponse);
-  },
-  getOrders: () => {
-    return fetch("http://127.0.0.1:8000/purchases/orders", {
-      headers: getHeaders(),
-    }).then(handleResponse);
-  },
-  createOrder: (orderData) => {
-    return fetch("http://127.0.0.1:8000/purchases/orders", {
-      method: "POST",
-      headers: getHeaders(),
-      body: JSON.stringify(orderData),
-    }).then(handleResponse);
-  },
-  completeOrder: (orderId) => {
-    return fetch(`http://127.0.0.1:8000/purchases/orders/${orderId}/complete`, {
-      method: "PUT",
-      headers: getHeaders(),
-    }).then(handleResponse);
-  },
-  getSuppliers: () => {
-    return fetch("http://127.0.0.1:8000/suppliers/", {
-      headers: getHeaders(),
-    }).then(handleResponse);
-  },
- getMaterialSuppliers: (materialId) => {
-  return fetch(`http://127.0.0.1:8000/suppliers/by-material/${materialId}`, {
-    headers: getHeaders(),
-  }).then(handleResponse);
-},
-};
+// =========================================================
+// COMPONENTE PRINCIPAL
+// =========================================================
 
 const Purchases = () => {
   const [materials, setMaterials] = useState([]);
@@ -96,6 +155,7 @@ const Purchases = () => {
   const [orders, setOrders] = useState([]);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [isLoading, setIsLoading] = useState(true); // Nuevo estado de carga
 
   const fetchMaterials = async () => {
     try {
@@ -110,7 +170,14 @@ const Purchases = () => {
   const fetchOrders = async () => {
     try {
       const data = await api.getOrders();
-      setOrders(Array.isArray(data) ? data : []);
+      // Asegurarse de que el campo 'status' esté en minúsculas para el CSS
+      const formattedOrders = Array.isArray(data)
+        ? data.map(order => ({
+            ...order,
+            status: order.status ? order.status.toLowerCase() : 'pendiente'
+          }))
+        : [];
+      setOrders(formattedOrders);
     } catch (err) {
       console.error("Error fetching orders:", err);
       setError("Error al cargar las órdenes de compra: " + err.message);
@@ -123,7 +190,7 @@ const Purchases = () => {
       setAvailableSuppliers(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Error fetching material suppliers:", err);
-      // Si no hay endpoint específico, cargar todos los suppliers
+      // Fallback a cargar todos los proveedores si la ruta específica falla
       try {
         const allSuppliers = await api.getSuppliers();
         setAvailableSuppliers(Array.isArray(allSuppliers) ? allSuppliers : []);
@@ -133,16 +200,19 @@ const Purchases = () => {
     }
   };
 
+  // Carga inicial de datos
   useEffect(() => {
-  fetchMaterials(); // prioridad
-
-  // Cargar historial en segundo plano después de 2 segundos
-  const timer = setTimeout(() => {
-    fetchOrders();
-  }, 2000);
-
-  return () => clearTimeout(timer);
-}, []);
+    const loadData = async () => {
+      setIsLoading(true);
+      setError(""); // Limpiar errores previos
+      await Promise.all([
+        fetchMaterials(),
+        fetchOrders()
+      ]);
+      setIsLoading(false);
+    };
+    loadData();
+  }, []);
 
 
   const handleMaterialChange = async (materialId) => {
@@ -150,13 +220,12 @@ const Purchases = () => {
     setSelectedSupplier("");
     setSelectedSupplierData(null);
     setAvailableSuppliers([]);
+    setError("");
 
     if (materialId) {
-      // Buscar los datos del material seleccionado
       const material = materials.find(m => m.id === parseInt(materialId));
       setSelectedMaterialData(material);
 
-      // Cargar proveedores disponibles para este material
       await fetchMaterialSuppliers(materialId);
     } else {
       setSelectedMaterialData(null);
@@ -165,9 +234,9 @@ const Purchases = () => {
 
   const handleSupplierChange = (supplierId) => {
     setSelectedSupplier(supplierId);
+    setError("");
 
     if (supplierId) {
-      // Buscar los datos del proveedor seleccionado
       const supplier = availableSuppliers.find(s => s.id === parseInt(supplierId));
       setSelectedSupplierData(supplier);
     } else {
@@ -204,16 +273,14 @@ const Purchases = () => {
       }
 
       const orderData = {
-        supplier_id: parseInt(selectedSupplier), // Cambio: enviar supplier_id en lugar de supplier_name
+        supplier_id: parseInt(selectedSupplier),
         material_id: parseInt(selectedMaterial),
         quantity: quantityNum,
       };
 
-      console.log("Enviando orden:", orderData);
       const result = await api.createOrder(orderData);
-      console.log("Orden creada:", result);
 
-      setSuccess("Orden de compra creada exitosamente.");
+      setSuccess(`Orden de compra #${result.id} creada exitosamente.`);
 
       // Limpiar formulario
       setSelectedMaterial("");
@@ -223,26 +290,11 @@ const Purchases = () => {
       setAvailableSuppliers([]);
       setQuantity("");
 
-      // Recargar órdenes
+      // Recargar materiales y órdenes (el stock del material habrá cambiado)
+      await fetchMaterials();
       await fetchOrders();
     } catch (err) {
-      console.error("Error creating order:", err);
-      console.error("Error details:", {
-        message: err.message,
-        stack: err.stack,
-        name: err.name
-      });
-
-      let errorMsg = "Error desconocido";
-      if (err instanceof Error) {
-        errorMsg = err.message;
-      } else if (typeof err === 'string') {
-        errorMsg = err;
-      } else {
-        errorMsg = JSON.stringify(err);
-      }
-
-      setError("Error al crear la orden: " + errorMsg);
+      setError("Error al crear la orden: " + err.message);
     }
   };
 
@@ -251,59 +303,76 @@ const Purchases = () => {
     setSuccess("");
 
     try {
-      console.log("Completando orden:", orderId);
       await api.completeOrder(orderId);
       setSuccess("Orden de compra completada y stock actualizado.");
+      // Recargar materiales y órdenes (el stock del material habrá cambiado)
+      await fetchMaterials();
       await fetchOrders();
     } catch (err) {
-      console.error("Error completing order:", err);
       setError("Error al completar la orden: " + err.message);
     }
   };
+
+  if (isLoading) {
+    return (
+        <div className="container" style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', flexDirection: 'column'}}>
+            <h1 style={{color: '#0d9488', fontSize: '1.5rem'}}>Cargando datos del servidor...</h1>
+            <div style={{
+                border: '4px solid rgba(0, 0, 0, 0.1)',
+                borderTop: '4px solid #0d9488',
+                borderRadius: '50%',
+                width: '40px',
+                height: '40px',
+                animation: 'spin 1s linear infinite',
+                marginTop: '1rem'
+            }}></div>
+            <style>{`
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            `}</style>
+        </div>
+    );
+  }
+
 
   return (
     <>
       <style>
         {`
           :root {
-            --bg-color: #f3f4f6;
-            --text-color: #374151;
-            --card-bg: #ffffff;
-            --border-color: #e5e7eb;
-            --primary-color: #4f46e5;
-            --primary-hover-color: #4338ca;
-            --error-bg: #fee2e2;
-            --error-text: #b91c1c;
-            --success-bg: #dcfce7;
-            --success-text: #166534;
-            --table-header-bg: #f9fafb;
-            --yellow-bg: #fef3c7;
-            --yellow-text: #92400e;
-            --green-bg: #d1fae5;
-            --green-text: #065f46;
-            --info-bg: #dbeafe;
-            --info-text: #1e40af;
-            --info-border: #3b82f6;
+            /* Colores Base - Tema de luz brillante */
+            --bg-color: #f7f9fc; /* Fondo claro/blanco roto */
+            --text-color: #1f2937; /* Texto oscuro */
+            --card-bg: #ffffff; /* Fondo de tarjetas blanco puro */
+            --border-color: #e5e7eb; /* Borde claro */
+            --primary-color: #0d9488; /* Teal vibrante como color principal */
+            --primary-hover-color: #0f766e;
+
+            /* Alertas y Estados */
+            --error-bg: #fee2e2; /* Red 100 */
+            --error-text: #b91c1c; /* Red 700 */
+            --success-bg: #dcfce7; /* Green 100 */
+            --success-text: #16a34a; /* Green 700 */
+            --table-header-bg: #f3f4f6; /* Gris muy claro */
+            --yellow-bg: #fffbe6; /* Yellow 50 */
+            --yellow-text: #a16207; /* Yellow 700 */
+            --green-bg: #d1fae5; /* Green 100 */
+            --green-text: #059669; /* Green 600 */
+            --info-bg: #e0f2f1; /* Teal 100 */
+            --info-text: #0d9488; /* Teal 600 */
+            --info-border: #2dd4bf; /* Teal 300 */
           }
 
+          /* Modo oscuro anulado para mantener la consistencia de los colores claros */
           @media (prefers-color-scheme: dark) {
             :root {
-              --bg-color: #111827;
-              --text-color: #d1d5db;
-              --card-bg: #1f2937;
-              --border-color: #374151;
-              --error-bg: #450a0a;
-              --error-text: #fca5a5;
-              --success-bg: #064e3b;
-              --success-text: #6ee7b7;
-              --table-header-bg: #1f2937;
-              --yellow-bg: #44400e;
-              --yellow-text: #fde68a;
-              --green-bg: #065f46;
-              --green-text: #a7f3d0;
-              --info-bg: #1e3a8a;
-              --info-text: #93c5fd;
-              --info-border: #3b82f6;
+                --bg-color: #f7f9fc;
+                --text-color: #1f2937;
+                --card-bg: #ffffff;
+                --border-color: #e5e7eb;
+                --table-header-bg: #f3f4f6;
             }
           }
 
@@ -312,21 +381,28 @@ const Purchases = () => {
             background-color: var(--bg-color);
             min-height: 100vh;
             color: var(--text-color);
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.3s;
           }
 
           .title {
             font-size: 2.25rem;
             font-weight: 700;
-            color: var(--text-color);
+            color: var(--primary-color);
             margin-bottom: 1.5rem;
           }
 
           .card {
             background-color: var(--card-bg);
-            border-radius: 0.5rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border-radius: 0.75rem; /* Ligeramente más redondeado */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* Sombra más pronunciada */
             padding: 1.5rem;
             margin-bottom: 1.5rem;
+            transition: box-shadow 0.3s;
+          }
+
+          .card:hover {
+             box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
           }
 
           .subtitle {
@@ -334,13 +410,18 @@ const Purchases = () => {
             font-weight: 600;
             color: var(--text-color);
             margin-bottom: 1rem;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 0.5rem;
           }
 
           .alert {
             padding: 1rem;
             margin-bottom: 1rem;
-            border-left: 4px solid;
-            border-radius: 0.5rem;
+            border-left: 5px solid; /* Borde más grueso */
+            border-radius: 0.375rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+            line-height: 1.4;
           }
 
           .alert.error {
@@ -361,18 +442,19 @@ const Purchases = () => {
             border-radius: 0.5rem;
             padding: 1rem;
             margin-bottom: 1rem;
+            color: var(--info-text);
           }
 
           .info-title {
-            font-weight: 600;
-            color: var(--info-text);
+            font-weight: 700;
+            color: var(--primary-color);
             margin-bottom: 0.5rem;
           }
 
           .info-content {
-            color: var(--info-text);
             font-size: 0.875rem;
-            line-height: 1.5;
+            line-height: 1.6;
+            color: var(--info-text);
           }
 
           .form-group {
@@ -382,41 +464,53 @@ const Purchases = () => {
           .form-label {
             display: block;
             color: var(--text-color);
-            margin-bottom: 0.25rem;
-            font-weight: 500;
+            margin-bottom: 0.4rem;
+            font-weight: 600; /* Más énfasis */
+            font-size: 0.95rem;
           }
 
           .form-input, .form-select {
             display: block;
             width: 100%;
-            padding: 0.5rem;
-            border-radius: 0.375rem;
+            padding: 0.6rem;
+            border-radius: 0.5rem;
             border: 1px solid var(--border-color);
-            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            box-shadow: inset 0 1px 2px 0 rgba(0, 0, 0, 0.05);
             background-color: var(--card-bg);
             color: var(--text-color);
+            transition: border-color 0.2s, box-shadow 0.2s;
           }
 
           .form-select:focus, .form-input:focus {
             outline: none;
             border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+            box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.2); /* Sombra de enfoque con color primario */
           }
 
           .button {
             width: 100%;
             background-color: var(--primary-color);
             color: #ffffff;
-            padding: 0.5rem 1rem;
-            border-radius: 0.375rem;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
             border: none;
             cursor: pointer;
-            transition: background-color 0.2s;
-            font-weight: 500;
+            transition: background-color 0.2s, transform 0.1s;
+            font-weight: 700;
+            margin-top: 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            letter-spacing: 0.025em;
           }
 
-          .button:hover {
+          .button:hover:not(:disabled) {
             background-color: var(--primary-hover-color);
+            transform: translateY(-1px);
+          }
+
+          .button:active:not(:disabled) {
+            transform: translateY(0);
           }
 
           .button:disabled {
@@ -426,48 +520,59 @@ const Purchases = () => {
 
           .table-container {
             overflow-x: auto;
+            border-radius: 0.5rem;
+            border: 1px solid var(--border-color);
           }
 
           .table {
             width: 100%;
             border-collapse: collapse;
+            min-width: 900px; /* Ancho mínimo para legibilidad */
           }
 
           .table thead {
             background-color: var(--table-header-bg);
+            border-bottom: 2px solid var(--border-color);
           }
 
           .table th {
-            padding: 0.75rem 1.5rem;
+            padding: 0.8rem 1.5rem;
             text-align: left;
             font-size: 0.75rem;
-            font-weight: 500;
-            color: #6b7280;
+            font-weight: 700;
+            color: #4b5563; /* Gris más oscuro */
             text-transform: uppercase;
             letter-spacing: 0.05em;
           }
 
           .table td {
             padding: 1rem 1.5rem;
-            white-space: nowrap;
             border-bottom: 1px solid var(--border-color);
+            font-size: 0.875rem;
+            color: var(--text-color);
           }
 
-          .table tbody tr {
-            background-color: var(--card-bg);
+          .table tbody tr:last-child td {
+            border-bottom: none;
+          }
+
+          .table tbody tr:hover {
+            background-color: #f9f9fb; /* Gris muy ligero al pasar el ratón */
           }
 
           .status-badge {
             display: inline-flex;
-            padding: 0.25rem 0.5rem;
+            padding: 0.3rem 0.6rem;
             font-size: 0.75rem;
-            font-weight: 600;
+            font-weight: 700;
             border-radius: 9999px;
+            text-transform: capitalize;
+            letter-spacing: 0.05em;
           }
 
           .status-badge.realizada {
-            background-color: var(--green-bg);
-            color: var(--green-text);
+            background-color: var(--success-bg);
+            color: var(--success-text);
           }
 
           .status-badge.pendiente {
@@ -481,10 +586,17 @@ const Purchases = () => {
             border: none;
             background: none;
             cursor: pointer;
+            transition: color 0.2s, transform 0.1s;
+            border-radius: 0.375rem;
           }
 
           .action-button:hover {
             color: var(--primary-hover-color);
+            background-color: #f0fdfa; /* Teal 50 */
+          }
+
+          .action-button:active {
+            transform: scale(0.95);
           }
         `}
       </style>
@@ -542,7 +654,7 @@ const Purchases = () => {
                 value={selectedSupplier}
                 onChange={(e) => handleSupplierChange(e.target.value)}
                 className="form-select"
-                disabled={!selectedMaterial}
+                disabled={!selectedMaterial || availableSuppliers.length === 0}
               >
                 <option value="">-- Selecciona un proveedor --</option>
                 {availableSuppliers.map((supplier) => (
@@ -551,6 +663,8 @@ const Purchases = () => {
                   </option>
                 ))}
               </select>
+              {!selectedMaterial && <small style={{display: 'block', marginTop: '0.5rem', color: '#6b7280'}}>Selecciona un material primero para ver los proveedores.</small>}
+              {selectedMaterial && availableSuppliers.length === 0 && <small style={{display: 'block', marginTop: '0.5rem', color: '#dc2626'}}>⚠️ No se encontraron proveedores para este material.</small>}
             </div>
 
             {selectedSupplierData && (
@@ -591,7 +705,7 @@ const Purchases = () => {
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
                 className="form-input"
-                placeholder="Ingresa la cantidad"
+                placeholder="Ingresa la cantidad a solicitar"
                 disabled={!selectedSupplier}
               />
             </div>
@@ -601,6 +715,7 @@ const Purchases = () => {
               className="button"
               disabled={!selectedMaterial || !selectedSupplier || !quantity}
             >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: '8px'}}><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
               Crear Orden de Compra
             </button>
           </form>
@@ -630,12 +745,13 @@ const Purchases = () => {
                       <tr key={order.id}>
                         <td>{order.id}</td>
                         <td>{new Date(order.date).toLocaleDateString()}</td>
-                        <td>{order.supplier_name}</td>
+                        <td>{order.supplier_name || 'Desconocido'}</td>
                         <td>
                           {material ? material.name : `ID: ${order.material_id}`}
                         </td>
                         <td>{order.quantity}</td>
                         <td>
+                          {/* El status ahora está garantizado en minúsculas */}
                           <span className={`status-badge ${order.status}`}>
                             {order.status}
                           </span>
@@ -645,7 +761,7 @@ const Purchases = () => {
                             <button
                               onClick={() => handleCompleteOrder(order.id)}
                               className="action-button"
-                              title="Marcar como realizada"
+                              title="Marcar como recibida y actualizar stock"
                             >
                               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-check-circle"><path d="M22 11.08V12a10 10 0 1 1-5.93-8.8"/><path d="M22 4L12 14.01l-3-3"/></svg>
                             </button>
