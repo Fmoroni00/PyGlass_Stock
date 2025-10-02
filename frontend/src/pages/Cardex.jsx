@@ -1,61 +1,6 @@
 import React, { useEffect, useState } from "react";
 import * as XLSX from 'xlsx';
-
-const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
-
-const getToken = () => {
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem("token");
-  }
-  return null;
-};
-
-const getHeaders = () => {
-  const headers = {
-    "Content-Type": "application/json",
-  };
-  const token = getToken();
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-  return headers;
-};
-
-const handleResponse = async (response) => {
-  if (!response.ok) {
-    let errorMessage = "Error en la petición";
-    try {
-      const error = await response.json();
-      if (typeof error === 'string') {
-        errorMessage = error;
-      } else if (error.detail) {
-        if (typeof error.detail === 'string') {
-          errorMessage = error.detail;
-        } else if (Array.isArray(error.detail)) {
-          errorMessage = error.detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ');
-        } else {
-          errorMessage = JSON.stringify(error.detail);
-        }
-      } else if (error.message) {
-        errorMessage = error.message;
-      } else {
-        errorMessage = JSON.stringify(error);
-      }
-    } catch (e) {
-      errorMessage = `Error ${response.status}: ${response.statusText}`;
-    }
-    throw new Error(errorMessage);
-  }
-  return response.json();
-};
-
-const api = {
-  getKardex: () => {
-    return fetch(`${API_URL}/kardex/`, {
-      headers: getHeaders(),
-    }).then(handleResponse);
-  },
-};
+import { api } from "../services/api";
 
 export default function Cardex() {
   const [records, setRecords] = useState([]);
@@ -65,8 +10,8 @@ export default function Cardex() {
   const [isExporting, setIsExporting] = useState(false);
 
   // Filtros
-  const [filterType, setFilterType] = useState('all'); // all, material, product
-  const [filterMovement, setFilterMovement] = useState('all'); // all, entrada, salida, ajuste
+  const [filterType, setFilterType] = useState('all');
+  const [filterMovement, setFilterMovement] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
@@ -94,7 +39,6 @@ export default function Cardex() {
   const applyFilters = () => {
     let filtered = [...records];
 
-    // Filtrar por tipo (material/producto)
     if (filterType !== 'all') {
       filtered = filtered.filter(record => {
         if (filterType === 'material') {
@@ -107,7 +51,6 @@ export default function Cardex() {
       });
     }
 
-    // Filtrar por tipo de movimiento
     if (filterMovement !== 'all') {
       filtered = filtered.filter(record => {
         const movementType = record.movement_type?.toLowerCase() || '';
@@ -124,7 +67,6 @@ export default function Cardex() {
       });
     }
 
-    // Filtrar por búsqueda de texto
     if (searchTerm.trim()) {
       const search = searchTerm.toLowerCase();
       filtered = filtered.filter(record => {

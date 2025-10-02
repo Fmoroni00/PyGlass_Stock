@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { api } from "../services/api";
 
 export default function Materials() {
@@ -8,6 +8,7 @@ export default function Materials() {
   const [newStock, setNewStock] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const isSavingRef = useRef(false);
 
   useEffect(() => {
     fetchMaterials();
@@ -28,22 +29,49 @@ export default function Materials() {
   };
 
   const saveStock = async (id) => {
+    // Prevenir múltiples llamadas simultáneas
+    if (isSavingRef.current) {
+      console.log("Ya hay un guardado en proceso, ignorando");
+      return;
+    }
+
     const parsed = parseInt(newStock, 10);
     if (isNaN(parsed)) {
       alert("El valor debe ser un número válido");
       return;
     }
+
+    const material = materials.find((m) => m.id === id);
+    if (!material) return;
+
+    // Verificar si realmente cambió el stock
+    if (parsed === material.stock) {
+      console.log("El stock no cambió, no se actualizará");
+      setEditingId(null);
+      return;
+    }
+
     try {
+      isSavingRef.current = true;
       setIsSaving(true);
-      const material = materials.find((m) => m.id === id);
-      if (!material) return;
-      await api.updateMaterial(id, { ...material, stock: parsed });
+
+      // SOLO enviar el campo stock que cambió
+      const updateData = {
+        stock: parsed
+      };
+
+      console.log(`Actualizando material ${id} con nuevo stock: ${parsed} (anterior: ${material.stock})`);
+
+      await api.updateMaterial(id, updateData);
+
+      console.log("Material actualizado exitosamente");
       setEditingId(null);
       await fetchMaterials();
     } catch (err) {
       console.error("Error modificando stock:", err);
-      alert("Error al guardar los cambios");
+      alert("Error al guardar los cambios: " + (err.message || "Error desconocido"));
     } finally {
+      isSavingRef.current = false;
       setIsSaving(false);
     }
   };
