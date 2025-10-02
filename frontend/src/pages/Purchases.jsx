@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
@@ -96,6 +96,9 @@ export default function Purchases() {
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
   const [processingOrderId, setProcessingOrderId] = useState(null);
 
+  const isCreatingOrderRef = useRef(false);
+  const processingOrderRef = useRef(null);
+
   const fetchMaterials = async () => {
     try {
       const data = await api.getMaterials();
@@ -166,6 +169,12 @@ export default function Purchases() {
   };
 
   const handleCreateOrder = async () => {
+    // Verificar si ya hay una operación en curso
+    if (isCreatingOrderRef.current) {
+      console.log("Ya hay una orden siendo creada, ignorando clic duplicado");
+      return;
+    }
+
     setError("");
     setSuccess("");
 
@@ -183,7 +192,10 @@ export default function Purchases() {
       return;
     }
 
+    // Marcar que estamos procesando
+    isCreatingOrderRef.current = true;
     setIsCreatingOrder(true);
+
     try {
       const orderData = {
         supplier_id: parseInt(selectedSupplier),
@@ -205,14 +217,24 @@ export default function Purchases() {
     } catch (err) {
       setError("Error al crear orden: " + err.message);
     } finally {
+      // Liberar el bloqueo
+      isCreatingOrderRef.current = false;
       setIsCreatingOrder(false);
     }
   };
 
   const handleCompleteOrder = async (orderId) => {
+    // Verificar si ya se está procesando esta orden
+    if (processingOrderRef.current === orderId) {
+      console.log("Esta orden ya se está procesando, ignorando clic duplicado");
+      return;
+    }
+
     setError("");
     setSuccess("");
+    processingOrderRef.current = orderId;
     setProcessingOrderId(orderId);
+
     try {
       await api.completeOrder(orderId);
       setSuccess("Orden completada y stock actualizado.");
@@ -221,11 +243,18 @@ export default function Purchases() {
     } catch (err) {
       setError("Error al completar orden: " + err.message);
     } finally {
+      processingOrderRef.current = null;
       setProcessingOrderId(null);
     }
   };
 
   const handleCancelOrder = async (orderId) => {
+    // Verificar si ya se está procesando esta orden
+    if (processingOrderRef.current === orderId) {
+      console.log("Esta orden ya se está procesando, ignorando clic duplicado");
+      return;
+    }
+
     setError("");
     setSuccess("");
 
@@ -233,7 +262,9 @@ export default function Purchases() {
       return;
     }
 
+    processingOrderRef.current = orderId;
     setProcessingOrderId(orderId);
+
     try {
       await api.cancelOrder(orderId);
       setSuccess("Orden cancelada exitosamente.");
@@ -241,6 +272,7 @@ export default function Purchases() {
     } catch (err) {
       setError("Error al cancelar orden: " + err.message);
     } finally {
+      processingOrderRef.current = null;
       setProcessingOrderId(null);
     }
   };
