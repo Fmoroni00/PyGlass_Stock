@@ -166,59 +166,72 @@ export default function App() {
             </svg>
           </button>
 
-          {/* Menú de navegación */}
-          <div className={`collapse navbar-collapse ${showMenu ? 'show' : ''}`}>
-            <div className="navbar-nav ms-auto gap-2 mt-3 mt-lg-0">
-              <button
-                className={`btn btn-sm ${page === 'materials' ? 'btn-primary' : 'btn-outline-primary'}`}
-                onClick={() => handlePageChange("materials")}
-              >
-                🧱 <span className="d-none d-md-inline">Materias Primas</span>
-                <span className="d-md-none">Materias</span>
-              </button>
-              <button
-                className={`btn btn-sm ${page === 'products' ? 'btn-primary' : 'btn-outline-primary'}`}
-                onClick={() => handlePageChange("products")}
-              >
-                📋 Productos
-              </button>
-              <button
-                className={`btn btn-sm ${page === 'purchases' ? 'btn-primary' : 'btn-outline-primary'}`}
-                onClick={() => handlePageChange("purchases")}
-              >
-                🛒 <span className="d-none d-md-inline">Órdenes</span>
-                <span className="d-md-none">Compras</span>
-              </button>
-              <button
-                className={`btn btn-sm ${page === 'cardex' ? 'btn-primary' : 'btn-outline-primary'}`}
-                onClick={() => handlePageChange("cardex")}
-              >
-                📊 Cardex
-              </button>
-              <button
-                className="btn btn-sm btn-danger"
-                onClick={handleLogout}
-              >
-                🚪 <span className="d-none d-sm-inline">Cerrar Sesión</span>
-                <span className="d-sm-none">Salir</span>
-              </button>
-            </div>
+                  {/* Menú de navegación */}
+        <div className={`collapse navbar-collapse ${showMenu ? 'show' : ''}`}>
+          <div className="navbar-nav ms-auto gap-2 mt-3 mt-lg-0">
+
+            {/* Órdenes de compra */}
+            <button
+              className={`btn btn-sm ${page === 'purchases' ? 'btn-primary' : 'btn-outline-primary'}`}
+              onClick={() => handlePageChange("purchases")}
+            >
+              🛒 <span className="d-none d-md-inline">Órdenes de Compra</span>
+              <span className="d-md-none">Órdenes</span>
+            </button>
+
+            {/* Inventario materiales */}
+            <button
+              className={`btn btn-sm ${page === 'materials' ? 'btn-primary' : 'btn-outline-primary'}`}
+              onClick={() => handlePageChange("materials")}
+            >
+              🧱 <span className="d-none d-md-inline">Inventario de Materiales</span>
+              <span className="d-md-none">Materiales</span>
+            </button>
+
+            {/* Kardex */}
+            <button
+              className={`btn btn-sm ${page === 'cardex' ? 'btn-primary' : 'btn-outline-primary'}`}
+              onClick={() => handlePageChange("cardex")}
+            >
+              📊 <span className="d-none d-md-inline">Kardex</span>
+              <span className="d-md-none">Kardex</span>
+            </button>
+
+            {/* Inventario productos terminados */}
+            <button
+              className={`btn btn-sm ${page === 'products' ? 'btn-primary' : 'btn-outline-primary'}`}
+              onClick={() => handlePageChange("products")}
+            >
+              📋 <span className="d-none d-md-inline">Inventario de Productos Terminados</span>
+              <span className="d-md-none">Productos</span>
+            </button>
+
+            {/* Cerrar sesión */}
+            <button
+              className="btn btn-sm btn-danger"
+              onClick={handleLogout}
+            >
+              🚪 <span className="d-none d-sm-inline">Cerrar Sesión</span>
+              <span className="d-sm-none">Salir</span>
+            </button>
+
           </div>
         </div>
-      </nav>
+        </div>
+        </nav>
 
-      {/* Contenido principal */}
-      <main className="container-fluid px-3 px-lg-4 py-4">
-        <div className="card shadow-lg border-0" style={{
-          backgroundColor: 'rgba(255, 255, 255, 0.9)',
-          backdropFilter: 'blur(10px)',
-          minHeight: '500px'
-        }}>
-          <div className="card-body p-3 p-md-4">
-            {page === "materials" && <Materials />}
-            {page === "products" && <Products />}
-            {page === "purchases" && <Purchases />}
-            {page === "cardex" && <Cardex />}
+        {/* Contenido principal */}
+        <main className="container-fluid px-3 px-lg-4 py-4">
+          <div className="card shadow-lg border-0" style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.9)',
+            backdropFilter: 'blur(10px)',
+            minHeight: '500px'
+          }}>
+            <div className="card-body p-3 p-md-4">
+              {page === "purchases" && <Purchases />}
+              {page === "materials" && <Materials />}
+              {page === "cardex" && <kardex />}
+              {page === "products" && <Products />}
           </div>
         </div>
       </main>
