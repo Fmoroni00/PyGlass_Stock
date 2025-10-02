@@ -1,6 +1,5 @@
 export const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
-
 let token = null;
 
 /**
@@ -82,7 +81,7 @@ export const api = {
     }
 
     const result = await res.json();
-    setToken(result.access_token); // Guardar token en memoria y localStorage
+    setToken(result.access_token);
     return result;
   },
 
@@ -91,8 +90,8 @@ export const api = {
    */
   getMaterials: () => request("/materials/"),
   addMaterial: (data) => request("/materials/", "POST", data),
-  updateMaterial: (id, data) => request(`/materials/${id}/`, "PUT", data),
-  deleteMaterial: (id) => request(`/materials/${id}/`, "DELETE"),
+  updateMaterial: (id, data) => request(`/materials/${id}`, "PUT", data),
+  deleteMaterial: (id) => request(`/materials/${id}`, "DELETE"),
 
   /**
    * 🛠️ Productos
@@ -101,8 +100,6 @@ export const api = {
   addProduct: (data) => request("/products/", "POST", data),
   updateProduct: (id, data) => request(`/products/${id}/`, "PUT", data),
   deleteProduct: (id) => request(`/products/${id}/`, "DELETE"),
-
-  // ✅ Nuevos métodos para stock
   addStock: (id, quantity = 1) =>
     request(`/products/${id}/add/?quantity=${quantity}`, "POST"),
   removeStock: (id, quantity = 1) =>
@@ -119,4 +116,16 @@ export const api = {
    */
   getOrders: () => request("/purchases/orders/"),
   createOrder: (data) => request("/purchases/orders/", "POST", data),
+  completeOrder: (orderId) => request(`/purchases/orders/${orderId}/complete`, "PUT"),
+  cancelOrder: (orderId) => request(`/purchases/orders/${orderId}/cancel`, "PUT"),
+
+  /**
+   * 🏢 Proveedores
+   */
+  getMaterialSuppliers: (materialId) => request(`/suppliers/by-material/${materialId}`),
+
+  /**
+   * 📊 Kardex
+   */
+  getKardex: () => request("/kardex/"),
 };
