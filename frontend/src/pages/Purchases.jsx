@@ -93,6 +93,8 @@ export default function Purchases() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isCreatingOrder, setIsCreatingOrder] = useState(false);
+  const [processingOrderId, setProcessingOrderId] = useState(null);
 
   const fetchMaterials = async () => {
     try {
@@ -181,6 +183,7 @@ export default function Purchases() {
       return;
     }
 
+    setIsCreatingOrder(true);
     try {
       const orderData = {
         supplier_id: parseInt(selectedSupplier),
@@ -201,12 +204,15 @@ export default function Purchases() {
       await fetchOrders();
     } catch (err) {
       setError("Error al crear orden: " + err.message);
+    } finally {
+      setIsCreatingOrder(false);
     }
   };
 
   const handleCompleteOrder = async (orderId) => {
     setError("");
     setSuccess("");
+    setProcessingOrderId(orderId);
     try {
       await api.completeOrder(orderId);
       setSuccess("Orden completada y stock actualizado.");
@@ -214,6 +220,8 @@ export default function Purchases() {
       await fetchOrders();
     } catch (err) {
       setError("Error al completar orden: " + err.message);
+    } finally {
+      setProcessingOrderId(null);
     }
   };
 
@@ -225,12 +233,15 @@ export default function Purchases() {
       return;
     }
 
+    setProcessingOrderId(orderId);
     try {
       await api.cancelOrder(orderId);
       setSuccess("Orden cancelada exitosamente.");
       await fetchOrders();
     } catch (err) {
       setError("Error al cancelar orden: " + err.message);
+    } finally {
+      setProcessingOrderId(null);
     }
   };
 
@@ -462,9 +473,16 @@ export default function Purchases() {
                 onClick={handleCreateOrder}
                 className="btn w-100"
                 style={{ backgroundColor: '#0d9488', color: 'white' }}
-                disabled={!selectedMaterial || !selectedSupplier || !quantity}
+                disabled={!selectedMaterial || !selectedSupplier || !quantity || isCreatingOrder}
               >
-                Crear Orden de Compra
+                {isCreatingOrder ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    Procesando...
+                  </>
+                ) : (
+                  'Crear Orden de Compra'
+                )}
               </button>
             </div>
           </div>
@@ -511,8 +529,26 @@ export default function Purchases() {
                           <div className="d-flex gap-2 justify-content-center">
                             {order.status === 'pendiente' && (
                               <>
-                                <button onClick={() => handleCompleteOrder(order.id)} className="btn btn-sm btn-success" title="Completar">✓</button>
-                                <button onClick={() => handleCancelOrder(order.id)} className="btn btn-sm btn-danger" title="Cancelar">✕</button>
+                                <button
+                                  onClick={() => handleCompleteOrder(order.id)}
+                                  className="btn btn-sm btn-success"
+                                  title="Completar"
+                                  disabled={processingOrderId === order.id}
+                                >
+                                  {processingOrderId === order.id ? (
+                                    <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                  ) : '✓'}
+                                </button>
+                                <button
+                                  onClick={() => handleCancelOrder(order.id)}
+                                  className="btn btn-sm btn-danger"
+                                  title="Cancelar"
+                                  disabled={processingOrderId === order.id}
+                                >
+                                  {processingOrderId === order.id ? (
+                                    <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                  ) : '✕'}
+                                </button>
                               </>
                             )}
                             <button onClick={() => handlePrintOrder(order)} className="btn btn-sm btn-primary" title="Imprimir">🖨️</button>
@@ -551,8 +587,28 @@ export default function Purchases() {
                       <div className="d-flex gap-2">
                         {order.status === 'pendiente' && (
                           <>
-                            <button onClick={() => handleCompleteOrder(order.id)} className="btn btn-sm btn-success flex-grow-1">✓ Completar</button>
-                            <button onClick={() => handleCancelOrder(order.id)} className="btn btn-sm btn-danger flex-grow-1">✕ Cancelar</button>
+                            <button
+                              onClick={() => handleCompleteOrder(order.id)}
+                              className="btn btn-sm btn-success flex-grow-1"
+                              disabled={processingOrderId === order.id}
+                            >
+                              {processingOrderId === order.id ? (
+                                <><span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Procesando...</>
+                              ) : (
+                                <>✓ Completar</>
+                              )}
+                            </button>
+                            <button
+                              onClick={() => handleCancelOrder(order.id)}
+                              className="btn btn-sm btn-danger flex-grow-1"
+                              disabled={processingOrderId === order.id}
+                            >
+                              {processingOrderId === order.id ? (
+                                <><span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Procesando...</>
+                              ) : (
+                                <>✕ Cancelar</>
+                              )}
+                            </button>
                           </>
                         )}
                         <button onClick={() => handlePrintOrder(order)} className="btn btn-sm btn-primary">🖨️ Imprimir</button>
