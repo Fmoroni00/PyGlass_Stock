@@ -93,12 +93,14 @@ export default function Cardex() {
     if (isNaN(date)) {
       return "Fecha inválida";
     }
-    return date.toLocaleString("es-ES", {
+    return date.toLocaleString("es-PE", {
+      timeZone: "América/Lima",
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit"
+
     });
   };
 

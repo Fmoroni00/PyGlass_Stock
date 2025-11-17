@@ -47,7 +47,10 @@ export default function Materials() {
       alert("Por favor, ingresa un nombre para el material.");
       return;
     }
-
+    if (!newMaterial.type || newMaterial.type.trim() === "") {
+      alert("Por favor, ingresa el tipo de material (ej: Vidrio, Aluminio).");
+      return;
+    }
     setIsSaving(true); // Reutilizamos el estado 'isSaving'
     setError(null);
 
