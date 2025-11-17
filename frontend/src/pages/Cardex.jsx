@@ -93,8 +93,10 @@ export default function Cardex() {
     if (isNaN(date)) {
       return "Fecha inválida";
     }
+
+    // Usamos "es-PE" (Perú) y forzamos la zona horaria de Lima
     return date.toLocaleString("es-PE", {
-      timeZone: "América/Lima",
+      timeZone: "America/Lima",  // <-- Esta es la línea clave
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
