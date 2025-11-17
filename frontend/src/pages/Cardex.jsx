@@ -93,12 +93,16 @@ export default function Cardex() {
     if (isNaN(date)) {
       return "Fecha inválida";
     }
-    return date.toLocaleString("es-ES", {
+
+    // Usamos "es-PE" (Perú) y forzamos la zona horaria de Lima
+    return date.toLocaleString("es-PE", {
+      timeZone: "America/Lima",  // <-- Esta es la línea clave
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
       hour: "2-digit",
-      minute: "2-digit"
+      minute: "2-digit",
+      hour12: true // Esto mostrará AM/PM (ej. 01:30 PM)
     });
   };
 
