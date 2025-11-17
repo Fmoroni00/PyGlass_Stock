@@ -1,6 +1,15 @@
 import { useEffect, useState } from "react";
 import { api } from "../services/api";
 
+const INITIAL_FORM_STATE = {
+  name: "",
+  type: "",
+  color: "",
+  stock: 0,
+  min_stock: 0,
+  sale_price: 0.0, // <-- Campo extra para productos
+};
+
 export default function Products() {
   const [products, setProducts] = useState([]);
   const [error, setError] = useState(null);
@@ -8,6 +17,9 @@ export default function Products() {
   const [newStock, setNewStock] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newProduct, setNewProduct] = useState(INITIAL_FORM_STATE);
 
   useEffect(() => {
     fetchProducts();
@@ -24,6 +36,40 @@ export default function Products() {
       console.error(err);
     } finally {
       setIsLoading(false);
+    }
+  };
+  const handleCreateProduct = async (e) => {
+    e.preventDefault();
+
+    if (!newProduct.name || newProduct.name.trim() === "") {
+      alert("Por favor, ingresa un nombre para el producto.");
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      // 1. Llama a la API (Nota: 'sale_price' debe ser un número)
+      const dataToSend = {
+        ...newProduct,
+        sale_price: parseFloat(newProduct.sale_price) || 0.0
+      };
+
+      await api.addProduct(dataToSend);
+
+      // 2. Cierra el modal y resetea el formulario
+      setShowAddModal(false);
+      setNewProduct(INITIAL_FORM_STATE);
+
+      // 3. Recarga la lista de productos
+      await fetchProducts();
+
+    } catch (err) {
+      console.error("Error creando producto:", err);
+      setError("Error al crear el producto: " + (err.message || "Error desconocido"));
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -128,6 +174,14 @@ export default function Products() {
                 </div>
               </div>
               <div className="col-lg-4 col-md-5 text-md-end">
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="btn btn-success me-2"
+                  disabled={isSaving}
+                >
+
+                  ➕ Nuevo Producto
+                </button>
                 <button onClick={fetchProducts} className="btn btn-success d-inline-flex align-items-center gap-2">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                     <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4C7.58 4 4 7.58 4 12S7.58 20 12 20C15.73 20 18.84 17.45 19.73 14H17.65C16.83 16.33 14.61 18 12 18C8.69 18 6 15.31 6 12S8.69 6 12 6C13.66 6 15.14 6.69 16.22 7.78L13 11H20V4L17.65 6.35Z" fill="currentColor"/>
@@ -372,6 +426,137 @@ export default function Products() {
             </div>
           </div>
         )}
+        {showAddModal && (
+        <div className="modal" tabIndex="-1" style={{ display: 'block', backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+
+              <form onSubmit={handleCreateProduct}>
+
+                <div className="modal-header">
+                  <h5 className="modal-title">Crear Nuevo Producto</h5>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    onClick={() => setShowAddModal(false)}
+                    disabled={isSaving}
+                  ></button>
+                </div>
+
+                <div className="modal-body">
+                  {error && (
+                    <div className="alert alert-danger" role="alert">
+                      {error}
+                    </div>
+                  )}
+
+                  {/* Basado en el schema ProductBase */}
+                  <div className="mb-3">
+                    <label className="form-label fw-semibold">Nombre del Producto</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Ej: Ventana Corrediza 1x1m"
+                      value={newProduct.name}
+                      onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                      required
+                      disabled={isSaving}
+                    />
+                  </div>
+
+                  <div className="row">
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label">Tipo</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="Ej: Ventana"
+                        value={newProduct.type}
+                        onChange={(e) => setNewProduct({ ...newProduct, type: e.target.value })}
+                        disabled={isSaving}
+                      />
+                    </div>
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label">Color</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="Ej: Plateado"
+                        value={newProduct.color}
+                        onChange={(e) => setNewProduct({ ...newProduct, color: e.target.value })}
+                        disabled={isSaving}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="row">
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label">Stock Inicial</label>
+                      <input
+                        type="number"
+                        className="form-control"
+                        value={newProduct.stock}
+                        onChange={(e) => setNewProduct({ ...newProduct, stock: parseInt(e.target.value, 10) || 0 })}
+                        disabled={isSaving}
+                      />
+                    </div>
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label">Stock Mínimo</label>
+                      <input
+                        type="number"
+                        className="form-control"
+                        value={newProduct.min_stock}
+                        onChange={(e) => setNewProduct({ ...newProduct, min_stock: parseInt(e.target.value, 10) || 0 })}
+                        disabled={isSaving}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="form-label fw-semibold">Precio de Venta (S/.)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="form-control"
+                      placeholder="0.00"
+                      value={newProduct.sale_price}
+                      onChange={(e) => setNewProduct({ ...newProduct, sale_price: e.target.value })}
+                      disabled={isSaving}
+                    />
+                  </div>
+
+                </div>
+
+                <div className="modal-footer">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setShowAddModal(false)}
+                    disabled={isSaving}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-success"
+                    disabled={isSaving}
+                  >
+                    {isSaving ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        Guardando...
+                      </>
+                    ) : (
+                      'Guardar Producto'
+                    )}
+                  </button>
+                </div>
+
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );

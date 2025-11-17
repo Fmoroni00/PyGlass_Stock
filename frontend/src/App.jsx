@@ -230,7 +230,7 @@ export default function App() {
             <div className="card-body p-3 p-md-4">
               {page === "purchases" && <Purchases />}
               {page === "materials" && <Materials />}
-              {page === "cardex" && <kardex />}
+              {page === "cardex" && <Cardex />}
               {page === "products" && <Products />}
           </div>
         </div>

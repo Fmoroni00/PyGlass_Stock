@@ -1,88 +1,18 @@
 import React, { useState, useEffect, useRef } from "react";
+import { api } from "../services/api";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
-
-let sessionToken = null;
-
-function setToken(newToken) {
-  sessionToken = newToken;
-  if (typeof window !== 'undefined' && window.localStorage) {
-    if (newToken) {
-      localStorage.setItem("token", newToken);
-    } else {
-      localStorage.removeItem("token");
-    }
-  }
-}
-
-function getToken() {
-  if (!sessionToken && typeof window !== 'undefined' && window.localStorage) {
-    sessionToken = localStorage.getItem("token");
-  }
-  return sessionToken;
-}
-
-async function request(endpoint, method = "GET", body = null) {
-  const options = {
-    method,
-    headers: { "Content-Type": "application/json" },
-  };
-
-  const authToken = getToken();
-  if (authToken) {
-    options.headers["Authorization"] = `Bearer ${authToken}`;
-  }
-
-  if (body) {
-    options.body = JSON.stringify(body);
-  }
-
-  const MAX_RETRIES = 3;
-  let res;
-
-  for (let i = 0; i < MAX_RETRIES; i++) {
-    try {
-      res = await fetch(`${API_URL}${endpoint}`, options);
-      if (res.ok || res.status < 500) break;
-    } catch (error) {
-      if (i === MAX_RETRIES - 1) {
-        throw new Error(`Error de red: ${error.message}`);
-      }
-    }
-    await new Promise(resolve => setTimeout(resolve, 500 * (2 ** i)));
-  }
-
-  if (!res || !res.ok) {
-    if (!res) throw new Error("Fallo de conexión con el servidor.");
-    const errorData = await res.json().catch(() => ({}));
-    let errorMessage = `Error ${res.status}: `;
-    if (errorData?.detail) {
-      if (typeof errorData.detail === 'string') {
-        errorMessage += errorData.detail;
-      } else if (Array.isArray(errorData.detail)) {
-        errorMessage += errorData.detail.map(e => e.msg || e.message).join(', ');
-      }
-    } else {
-      errorMessage += res.statusText || "Error desconocido";
-    }
-    throw new Error(errorMessage);
-  }
-
-  if (res.status === 204) return {};
-  return res.json();
-}
-
-const api = {
-  getMaterials: () => request("/materials/"),
-  getOrders: () => request("/purchases/orders"),
-  createOrder: (data) => request("/purchases/orders", "POST", data),
-  completeOrder: (orderId) => request(`/purchases/orders/${orderId}/complete`, "PUT"),
-  cancelOrder: (orderId) => request(`/purchases/orders/${orderId}/cancel`, "PUT"),
-  getMaterialSuppliers: (materialId) => request(`/suppliers/by-material/${materialId}`),
+const INITIAL_SUPPLIER_STATE = {
+  name: "",
+  contact_person: "",
+  phone: "",
+  email: "",
+  address: "",
+  material_id: null, // Se llenará automáticamente
 };
-
 export default function Purchases() {
   const [materials, setMaterials] = useState([]);
+  const [showAddSupplierModal, setShowAddSupplierModal] = useState(false);
+  const [newSupplierData, setNewSupplierData] = useState(INITIAL_SUPPLIER_STATE);
   const [selectedMaterial, setSelectedMaterial] = useState("");
   const [selectedMaterialData, setSelectedMaterialData] = useState(null);
   const [availableSuppliers, setAvailableSuppliers] = useState([]);
@@ -129,6 +59,52 @@ export default function Purchases() {
       setAvailableSuppliers(Array.isArray(data) ? data : []);
     } catch (err) {
       setAvailableSuppliers([]);
+    }
+  };
+
+  const openNewSupplierModal = () => {
+    // Pre-carga el material_id del material ya seleccionado
+    setNewSupplierData({
+      ...INITIAL_SUPPLIER_STATE,
+      material_id: parseInt(selectedMaterial),
+    });
+    setShowAddSupplierModal(true); // Abre el modal
+    setError(""); // Limpia errores antiguos
+  };
+
+
+  const handleCreateSupplier = async (e) => {
+    e.preventDefault();
+
+    if (!newSupplierData.name || newSupplierData.name.trim() === "") {
+      alert("Por favor, ingresa un nombre para el proveedor.");
+      return;
+    }
+
+    setIsCreatingOrder(true); // Reutilizamos este estado para bloquear el botón
+    setError("");
+
+    try {
+
+      const newSupplier = await api.addSupplier(newSupplierData);
+
+      // 2. Cierra el modal y resetea el formulario
+      setShowAddSupplierModal(false);
+      setNewSupplierData(INITIAL_SUPPLIER_STATE);
+
+      // 3. Recarga la lista de proveedores para este material
+      await fetchMaterialSuppliers(selectedMaterial);
+
+      // 4. ¡MAGIA! Selecciona automáticamente el proveedor recién creado
+      setSelectedSupplier(newSupplier.id);
+      setSelectedSupplierData(newSupplier);
+
+    } catch (err) {
+      console.error("Error creando proveedor:", err);
+      // Muestra el error dentro del modal (si el modal sigue abierto)
+      setError("Error al crear: " + (err.message || "Error desconocido"));
+    } finally {
+      setIsCreatingOrder(false); // Libera el botón
     }
   };
 
@@ -453,7 +429,21 @@ export default function Purchases() {
 
             {/* Paso 2: Proveedor */}
             <div className="col-md-6">
-              <label className="form-label fw-semibold">2. Seleccionar Proveedor</label>
+              <div className="d-flex justify-content-between align-items-center mb-1">
+                <label className="form-label fw-semibold mb-0">2. Seleccionar Proveedor</label>
+
+                {/* Botón para abrir el modal de nuevo proveedor */}
+                <button
+                  type="button"
+                  className="btn btn-success btn-sm"
+                  onClick={openNewSupplierModal} // Llama a la función que abre el modal
+                  disabled={!selectedMaterial}   // Se desactiva si no has elegido material
+                  title="Añadir nuevo proveedor para este material"
+                  style={{ padding: '2px 8px', fontSize: '12px' }} // Opcional: ajuste fino de tamaño
+                >
+                  ➕ Nuevo
+                </button>
+              </div>
               <select
                 value={selectedSupplier}
                 onChange={(e) => handleSupplierChange(e.target.value)}
@@ -655,6 +645,138 @@ export default function Purchases() {
           </div>
         </div>
       </div>
+      {showAddSupplierModal && (
+        <div className="modal" tabIndex="-1" style={{ display: 'block', backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+
+              <form onSubmit={handleCreateSupplier}>
+
+                <div className="modal-header">
+                  <h5 className="modal-title">Añadir Nuevo Proveedor</h5>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    onClick={() => setShowAddSupplierModal(false)}
+                    disabled={isCreatingOrder}
+                  ></button>
+                </div>
+
+                <div className="modal-body">
+                  {/* Muestra el error aquí si falla la creación */}
+                  {error && (
+                    <div className="alert alert-danger" role="alert">
+                      {error}
+                    </div>
+                  )}
+
+                  {/* Basado en el schema SupplierCreate */}
+                  <div className="mb-3">
+                    <label className="form-label fw-semibold">Nombre del Proveedor</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Ej: Proveedor S.A."
+                      value={newSupplierData.name}
+                      onChange={(e) => setNewSupplierData({ ...newSupplierData, name: e.target.value })}
+                      required
+                      autoFocus
+                      disabled={isCreatingOrder}
+                    />
+                  </div>
+
+                  {/* Campo de Material (deshabilitado) */}
+                  <div className="mb-3">
+                    <label className="form-label">Material Asociado</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={selectedMaterialData?.name || `ID: ${selectedMaterial}`}
+                      disabled // El usuario no debe cambiar esto
+                    />
+                  </div>
+
+                  <div className="row">
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label">Contacto (Opcional)</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="Nombre del contacto"
+                        value={newSupplierData.contact_person}
+                        onChange={(e) => setNewSupplierData({ ...newSupplierData, contact_person: e.target.value })}
+                        disabled={isCreatingOrder}
+                      />
+                    </div>
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label">Teléfono (Opcional)</label>
+                      <input
+                        type="tel"
+                        className="form-control"
+                        placeholder="987654321"
+                        value={newSupplierData.phone}
+                        onChange={(e) => setNewSupplierData({ ...newSupplierData, phone: e.target.value })}
+                        disabled={isCreatingOrder}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="form-label">Email (Opcional)</label>
+                    <input
+                      type="email"
+                      className="form-control"
+                      placeholder="contacto@proveedor.com"
+                      value={newSupplierData.email}
+                      onChange={(e) => setNewSupplierData({ ...newSupplierData, email: e.target.value })}
+                      disabled={isCreatingOrder}
+                    />
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="form-label">Dirección (Opcional)</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Av. Principal 123"
+                      value={newSupplierData.address}
+                      onChange={(e) => setNewSupplierData({ ...newSupplierData, address: e.target.value })}
+                      disabled={isCreatingOrder}
+                    />
+                  </div>
+                </div>
+
+                <div className="modal-footer">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setShowAddSupplierModal(false)}
+                    disabled={isCreatingOrder}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={isCreatingOrder}
+                  >
+                    {isCreatingOrder ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        Guardando...
+                      </>
+                    ) : (
+                      'Guardar Proveedor'
+                    )}
+                  </button>
+                </div>
+
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* --- FIN DEL BLOQUE DEL MODAL --- */}
     </div>
   );
 }

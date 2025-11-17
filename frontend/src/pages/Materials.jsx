@@ -1,6 +1,14 @@
 import { useEffect, useState, useRef } from "react";
 import { api } from "../services/api";
 
+const INITIAL_FORM_STATE = {
+  name: "",
+  type: "",
+  color: "",
+  stock: 0,
+  min_stock: 0,
+};
+
 export default function Materials() {
   const [materials, setMaterials] = useState([]);
   const [error, setError] = useState(null);
@@ -9,6 +17,9 @@ export default function Materials() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const isSavingRef = useRef(false);
+
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newMaterial, setNewMaterial] = useState(INITIAL_FORM_STATE);
 
   useEffect(() => {
     fetchMaterials();
@@ -27,6 +38,38 @@ export default function Materials() {
       setIsLoading(false);
     }
   };
+
+  const handleCreateMaterial = async (e) => {
+    e.preventDefault(); // Previene que la página se recargue
+
+    // Validar que el nombre no esté vacío
+    if (!newMaterial.name || newMaterial.name.trim() === "") {
+      alert("Por favor, ingresa un nombre para el material.");
+      return;
+    }
+
+    setIsSaving(true); // Reutilizamos el estado 'isSaving'
+    setError(null);
+
+    try {
+      // 1. Llama a la API que añadimos en el Paso 1
+      await api.addMaterial(newMaterial);
+
+      // 2. Cierra el modal y resetea el formulario
+      setShowAddModal(false);
+      setNewMaterial(INITIAL_FORM_STATE);
+
+      // 3. Recarga la lista de materiales
+      await fetchMaterials();
+
+    } catch (err) {
+      console.error("Error creando material:", err);
+      setError("Error al crear el material: " + (err.message || "Error desconocido"));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
 
   const saveStock = async (id) => {
     // Prevenir múltiples llamadas simultáneas
@@ -131,6 +174,13 @@ export default function Materials() {
                 </div>
               </div>
               <div className="col-lg-4 col-md-5 text-md-end">
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="btn btn-success me-2"
+                  disabled={isSaving} // Deshabilitar si ya se está guardando algo
+                >
+                  ➕ Nuevo Material
+                </button>
                 <button onClick={fetchMaterials} className="btn btn-primary d-inline-flex align-items-center gap-2">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                     <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4C7.58 4 4 7.58 4 12S7.58 20 12 20C15.73 20 18.84 17.45 19.73 14H17.65C16.83 16.33 14.61 18 12 18C8.69 18 6 15.31 6 12S8.69 6 12 6C13.66 6 15.14 6.69 16.22 7.78L13 11H20V4L17.65 6.35Z" fill="currentColor"/>
@@ -343,6 +393,126 @@ export default function Materials() {
             </div>
           </div>
         )}
+        {showAddModal && (
+        <div className="modal" tabIndex="-1" style={{ display: 'block', backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+
+              {/* Usamos el handler que creamos en el Paso 3 */}
+              <form onSubmit={handleCreateMaterial}>
+
+                <div className="modal-header">
+                  <h5 className="modal-title">Crear Nuevo Material</h5>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    onClick={() => setShowAddModal(false)}
+                    disabled={isSaving}
+                  ></button>
+                </div>
+
+                <div className="modal-body">
+                  {/* Mensaje de error (opcional pero recomendado) */}
+                  {error && (
+                    <div className="alert alert-danger" role="alert">
+                      {error}
+                    </div>
+                  )}
+
+                  {/* Basado en el schema MaterialBase */}
+                  <div className="mb-3">
+                    <label className="form-label fw-semibold">Nombre del Material</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Ej: Vidrio Crudo 4mm"
+                      value={newMaterial.name}
+                      onChange={(e) => setNewMaterial({ ...newMaterial, name: e.target.value })}
+                      required
+                      disabled={isSaving}
+                    />
+                  </div>
+
+                  <div className="row">
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label">Tipo</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="Ej: Vidrio"
+                        value={newMaterial.type}
+                        onChange={(e) => setNewMaterial({ ...newMaterial, type: e.target.value })}
+                        disabled={isSaving}
+                      />
+                    </div>
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label">Color</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="Ej: Transparente"
+                        value={newMaterial.color}
+                        onChange={(e) => setNewMaterial({ ...newMaterial, color: e.target.value })}
+                        disabled={isSaving}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="row">
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label">Stock Inicial</label>
+                      <input
+                        type="number"
+                        className="form-control"
+                        value={newMaterial.stock}
+                        onChange={(e) => setNewMaterial({ ...newMaterial, stock: parseInt(e.target.value, 10) || 0 })}
+                        disabled={isSaving}
+                      />
+                    </div>
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label">Stock Mínimo</label>
+                      <input
+                        type="number"
+                        className="form-control"
+                        value={newMaterial.min_stock}
+                        onChange={(e) => setNewMaterial({ ...newMaterial, min_stock: parseInt(e.target.value, 10) || 0 })}
+                        disabled={isSaving}
+                      />
+                    </div>
+                  </div>
+
+                </div>
+
+                <div className="modal-footer">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setShowAddModal(false)}
+                    disabled={isSaving}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={isSaving}
+                  >
+                    {isSaving ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        Guardando...
+                      </>
+                    ) : (
+                      'Guardar Material'
+                    )}
+                  </button>
+                </div>
+
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );
