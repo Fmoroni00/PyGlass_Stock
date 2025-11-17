@@ -89,7 +89,7 @@ export const api = {
    * 📦 Materias Primas
    */
   getMaterials: () => request("/materials/"),
-  addMaterial: (data) => request("/materials/", "POST", data),
+  addMaterial: (data) => request("/materials/", "POST", data), //
   updateMaterial: (id, data) => request(`/materials/${id}`, "PUT", data),
   deleteMaterial: (id) => request(`/materials/${id}`, "DELETE"),
 
@@ -122,9 +122,11 @@ export const api = {
   /**
    * 🏢 Proveedores
    */
+  getSuppliers: () => request("/suppliers/"), // <-- AÑADIR ESTA LÍNEA
+  addSupplier: (data) => request("/suppliers/", "POST", data), // <-- AÑADIR ESTA LÍNEA
   getMaterialSuppliers: (materialId) => request(`/suppliers/by-material/${materialId}`),
-
   /**
+   *
    * 📊 Kardex
    */
   getKardex: () => request("/kardex/"),
