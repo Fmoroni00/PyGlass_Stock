@@ -46,6 +46,11 @@ export default function Products() {
       return;
     }
 
+    if (!newProduct.type || newProduct.type.trim() === "") {
+      alert("Por favor, ingresa el tipo de producto.");
+      return;
+    }
+
     setIsSaving(true);
     setError(null);
 

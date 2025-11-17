@@ -122,8 +122,9 @@ export const api = {
   /**
    * 🏢 Proveedores
    */
-  getSuppliers: () => request("/suppliers/"), // <-- AÑADIR ESTA LÍNEA
-  addSupplier: (data) => request("/suppliers/", "POST", data), // <-- AÑADIR ESTA LÍNEA
+  getSuppliers: () => request("/suppliers/"),
+   getSupplier: (id) => request(`/suppliers/${id}`),
+  addSupplier: (data) => request("/suppliers/", "POST", data),
   getMaterialSuppliers: (materialId) => request(`/suppliers/by-material/${materialId}`),
   /**
    *

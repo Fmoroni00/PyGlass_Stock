@@ -253,99 +253,159 @@ export default function Purchases() {
     }
   };
 
-  const handlePrintOrder = (order) => {
-    const material = materials.find(m => m.id === order.material_id);
-    const printWindow = window.open('', '_blank');
+  const handlePrintOrder = async (order) => {
+    try {
+      // 1. Obtenemos los datos frescos y completos del proveedor
+      const supplierData = await api.getSupplier(order.supplier_id);
 
-    const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="UTF-8">
-          <title>Orden de Compra #${order.id}</title>
-          <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { font-family: Arial, sans-serif; padding: 40px; color: #333; }
-            .header { border-bottom: 3px solid #0d9488; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }
-            .company-name { font-size: 28px; font-weight: bold; color: #0d9488; }
-            .document-title { font-size: 18px; color: #666; }
-            .order-number { font-size: 24px; font-weight: bold; color: #0d9488; }
-            .section { margin-bottom: 25px; }
-            .section-title { font-size: 14px; font-weight: bold; color: #0d9488; margin-bottom: 10px; text-transform: uppercase; }
-            .info-row { display: flex; padding: 8px 0; border-bottom: 1px solid #eee; }
-            .info-label { font-weight: bold; width: 150px; color: #666; }
-            .info-value { flex: 1; }
-            .table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-            .table th { background-color: #f3f4f6; padding: 12px; text-align: left; font-size: 12px; text-transform: uppercase; border: 1px solid #ddd; }
-            .table td { padding: 12px; border: 1px solid #ddd; }
-            .status-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: bold; text-transform: uppercase; }
-            .status-pendiente { background-color: #fffbe6; color: #a16207; }
-            .status-realizada { background-color: #dcfce7; color: #16a34a; }
-            .status-cancelada { background-color: #fee2e2; color: #dc2626; }
-            .footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; text-align: center; }
-            @media print { body { padding: 20px; } .no-print { display: none; } }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div>
-              <div class="company-name">PyGlass Stock</div>
-              <div class="document-title">Sistema de Inventario para Vidriería</div>
-            </div>
-            <div style="text-align: right;">
-              <div class="document-title">ORDEN DE COMPRA</div>
-              <div class="order-number">#${order.id}</div>
-            </div>
-          </div>
-          <div class="section">
-            <div class="section-title">Información General</div>
-            <div class="info-row">
-              <div class="info-label">Fecha:</div>
-              <div class="info-value">${new Date(order.date).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
-            </div>
-            <div class="info-row">
-              <div class="info-label">Estado:</div>
-              <div class="info-value"><span class="status-badge status-${order.status}">${order.status}</span></div>
-            </div>
-          </div>
-          <div class="section">
-            <div class="section-title">Proveedor</div>
-            <div class="info-row">
-              <div class="info-label">Nombre:</div>
-              <div class="info-value">${order.supplier_name || 'Desconocido'}</div>
-            </div>
-          </div>
-          <div class="section">
-            <div class="section-title">Detalle de la Orden</div>
-            <table class="table">
-              <thead>
-                <tr><th>ID Material</th><th>Descripción</th><th>Cantidad</th><th>Unidad</th></tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>${order.material_id}</td>
-                  <td>${material ? material.name : 'Material no encontrado'}</td>
-                  <td><strong>${order.quantity}</strong></td>
-                  <td>${material?.unit || 'Unidad'}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div class="footer">
-            <p>Documento generado por PyGlass Stock - ${new Date().toLocaleString('es-ES')}</p>
-            <p style="margin-top: 30px;">_______________________</p>
-            <p>Firma y Sello del Proveedor</p>
-          </div>
-          <div class="no-print" style="text-align: center; margin-top: 30px;">
-            <button onclick="window.print()" style="background-color: #0d9488; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; margin-right: 10px;">Imprimir / Guardar PDF</button>
-            <button onclick="window.close()" style="background-color: #6b7280; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer;">Cerrar</button>
-          </div>
-        </body>
-      </html>
-    `;
+      // 2. Buscamos el material (ya lo tenemos en memoria)
+      const material = materials.find(m => m.id === order.material_id);
 
-    printWindow.document.write(html);
-    printWindow.document.close();
+      // 3. Generamos el PDF
+      const printWindow = window.open('', '_blank');
+
+      // Preparamos los valores para que no salga "undefined"
+      const supName = supplierData.name || 'Sin nombre';
+      const supContact = supplierData.contact_person || '-';
+      const supPhone = supplierData.phone || '-';
+      const supEmail = supplierData.email || '-';
+      const supAddress = supplierData.address || '-';
+
+      const html = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="UTF-8">
+            <title>Orden de Compra #${order.id}</title>
+            <style>
+              * { margin: 0; padding: 0; box-sizing: border-box; }
+              body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #333; font-size: 14px; }
+              
+              /* Cabecera */
+              .header { border-bottom: 3px solid #0d9488; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-start; }
+              .company-info h1 { font-size: 28px; font-weight: bold; color: #0d9488; margin-bottom: 5px; }
+              .company-info p { color: #666; font-size: 14px; }
+              .document-info { text-align: right; }
+              .document-title { font-size: 16px; text-transform: uppercase; letter-spacing: 2px; color: #666; margin-bottom: 5px; }
+              .order-number { font-size: 32px; font-weight: bold; color: #333; }
+              
+              /* Grid de Información */
+              .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 30px; }
+              .box { background-color: #f9fafb; padding: 20px; border-radius: 8px; border: 1px solid #eee; }
+              .box-title { font-size: 14px; font-weight: bold; color: #0d9488; text-transform: uppercase; margin-bottom: 15px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+              
+              .info-row { display: flex; margin-bottom: 8px; }
+              .info-label { font-weight: 600; width: 100px; color: #555; }
+              .info-value { flex: 1; color: #111; }
+
+              /* Tabla */
+              .table-container { margin-top: 10px; }
+              .table { width: 100%; border-collapse: collapse; }
+              .table th { background-color: #0d9488; color: white; padding: 12px; text-align: left; font-size: 12px; text-transform: uppercase; }
+              .table td { padding: 12px; border-bottom: 1px solid #eee; }
+              .table tr:last-child td { border-bottom: 2px solid #0d9488; }
+              
+              /* Estado */
+              .status-badge { display: inline-block; padding: 5px 10px; border-radius: 4px; font-weight: bold; font-size: 12px; text-transform: uppercase; border: 1px solid; }
+              .status-pendiente { background-color: #fffbe6; color: #b45309; border-color: #fcd34d; }
+              .status-realizada { background-color: #dcfce7; color: #15803d; border-color: #86efac; }
+              .status-cancelada { background-color: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
+
+              /* Footer */
+              .footer { margin-top: 60px; display: flex; justify-content: space-between; align-items: flex-end; font-size: 12px; color: #666; }
+              .signature-box { text-align: center; border-top: 1px solid #333; width: 200px; padding-top: 10px; }
+              
+              @media print { 
+                body { padding: 0; } 
+                .no-print { display: none; } 
+                .box { border: 1px solid #ccc; }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <div class="company-info">
+                <h1>PyGlass Stock</h1>
+                <p>Sistema de Gestión de Inventario</p>
+                <p>Lima, Perú</p>
+              </div>
+              <div class="document-info">
+                <div class="document-title">Orden de Compra</div>
+                <div class="order-number">#${String(order.id).padStart(6, '0')}</div>
+                <p style="margin-top: 5px;">Fecha: ${new Date(order.date).toLocaleDateString('es-ES')}</p>
+              </div>
+            </div>
+
+            <div class="info-grid">
+              <div class="box">
+                <div class="box-title">Proveedor</div>
+                <div class="info-row"><div class="info-label">Empresa:</div><div class="info-value"><strong>${supName}</strong></div></div>
+                <div class="info-row"><div class="info-label">Contacto:</div><div class="info-value">${supContact}</div></div>
+                <div class="info-row"><div class="info-label">Teléfono:</div><div class="info-value">${supPhone}</div></div>
+                <div class="info-row"><div class="info-label">Email:</div><div class="info-value">${supEmail}</div></div>
+                <div class="info-row"><div class="info-label">Dirección:</div><div class="info-value">${supAddress}</div></div>
+              </div>
+
+              <div class="box">
+                <div class="box-title">Detalles Generales</div>
+                <div class="info-row"><div class="info-label">Estado:</div><div class="info-value"><span class="status-badge status-${order.status}">${order.status}</span></div></div>
+                <div class="info-row">
+                  <div class="info-label">Solicitante:</div>
+                  <div class="info-value" style="text-transform: capitalize;">
+                    ${order.user_name || 'Usuario #' + order.user_id}
+                  </div>
+                </div>
+                <div class="info-row"><div class="info-label">Emisión:</div><div class="info-value">${new Date().toLocaleString('es-ES')}</div></div>
+              </div>
+            </div>
+
+            <div class="section table-container">
+              <div class="box-title" style="border-bottom: none; margin-bottom: 5px;">Items Solicitados</div>
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 15%;">ID Ref.</th>
+                    <th style="width: 45%;">Descripción del Material</th>
+                    <th style="width: 20%;">Color / Tipo</th>
+                    <th style="width: 20%; text-align: right;">Cantidad Solicitada</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>${order.material_id}</td>
+                    <td><strong>${material ? material.name : 'Material no encontrado'}</strong></td>
+                    <td>${material ? (material.type + ' - ' + material.color) : '-'}</td>
+                    <td style="text-align: right; font-size: 16px; font-weight: bold;">${order.quantity}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="footer">
+              <div style="max-width: 60%;">
+                <p><strong>Observaciones:</strong></p>
+                <p>Por favor, confirmar recepción de esta orden y fecha estimada de entrega.</p>
+              </div>
+              <div class="signature-box">
+                Firma Autorizada
+              </div>
+            </div>
+
+            <div class="no-print" style="position: fixed; bottom: 20px; right: 20px; background: white; padding: 10px; border: 1px solid #ccc; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+              <button onclick="window.print()" style="background-color: #0d9488; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">🖨️ Imprimir / PDF</button>
+              <button onclick="window.close()" style="background-color: #6b7280; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; margin-left: 10px;">Cerrar</button>
+            </div>
+          </body>
+        </html>
+      `;
+
+      printWindow.document.write(html);
+      printWindow.document.close();
+
+    } catch (err) {
+      console.error("Error al imprimir:", err);
+      alert("No se pudieron cargar los datos completos del proveedor para la impresión.");
+    }
   };
 
   if (isLoading) {

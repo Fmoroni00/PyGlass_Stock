@@ -25,6 +25,7 @@ def get_orders(
     for order in orders:
         supplier = db.query(models.Supplier).filter(models.Supplier.id == order.supplier_id).first()
         order.supplier_name = supplier.name if supplier else f"Proveedor ID: {order.supplier_id}"
+        order.user_name = current_user.username
 
     return orders
 
@@ -66,6 +67,7 @@ def create_order(
     db.refresh(new_order)
 
     new_order.supplier_name = supplier.name
+    new_order.user_name = current_user.username
     return new_order
 
 
@@ -120,7 +122,7 @@ def complete_order(
     # Agregar nombre del proveedor
     supplier = db.query(models.Supplier).filter(models.Supplier.id == order.supplier_id).first()
     order.supplier_name = supplier.name if supplier else f"Proveedor ID: {order.supplier_id}"
-
+    order.user_name = current_user.username
     return order
 
 # 🔹 Cancelar una orden de compra
@@ -154,5 +156,5 @@ def cancel_order(
     # Agregar nombre del proveedor para la respuesta
     supplier = db.query(models.Supplier).filter(models.Supplier.id == order.supplier_id).first()
     order.supplier_name = supplier.name if supplier else f"Proveedor ID: {order.supplier_id}"
-
+    order.user_name = current_user.username
     return order

@@ -108,6 +108,8 @@ class PurchaseOrderOut(PurchaseOrderBase):
     date: Optional[datetime] = None
     status: Optional[str] = None
     supplier_name: Optional[str] = None
+    user_name: Optional[str] = None
+    user_id: int
 
     class Config:
         orm_mode = True
