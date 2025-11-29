@@ -45,14 +45,18 @@ def get_kardex(
         # Agregar nombre del material si existe
         if record.material_id:
             material = db.query(models.Material).filter(models.Material.id == record.material_id).first()
-            if material:
+            if material and material.name:
                 record.material_name = material.name
+            else:
+                record.material_name = f"Material ID: {record.material_id}"
 
         # Agregar nombre del producto si existe
         if record.product_id:
             product = db.query(models.Product).filter(models.Product.id == record.product_id).first()
-            if product:
+            if product and product.name:
                 record.product_name = product.name
+            else:
+                record.product_name = f"Producto ID: {record.product_id}"
 
     return kardex_records
 
@@ -79,7 +83,11 @@ def get_material_kardex(
 
     # Enriquecer registros con información adicional
     for record in kardex_records:
-        record.material_name = material.name
+        if material and material.name:
+            record.material_name = material.name
+        else:
+            record.material_name = f"Material ID: {material_id}"
+
         user = db.query(models.User).filter(models.User.id == record.user_id).first()
         if user:
             record.username = user.username
@@ -109,12 +117,17 @@ def get_product_kardex(
 
     # Enriquecer registros con información adicional
     for record in kardex_records:
-        record.product_name = product.name
+        if product and product.name:
+            record.product_name = product.name
+        else:
+            record.product_name = f"Producto ID: {product_id}"
+
         user = db.query(models.User).filter(models.User.id == record.user_id).first()
         if user:
             record.username = user.username
 
     return kardex_records
+
 
 
 @router.post("/", response_model=schemas.KardexOut, status_code=status.HTTP_201_CREATED)
