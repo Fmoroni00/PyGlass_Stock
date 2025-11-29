@@ -115,27 +115,38 @@ const formatDate = (dateString) => {
 };
 
 
-  const getItemDetails = (record) => {
+const getItemDetails = (record) => {
   if (record.material_id || record.material_name) {
+    const name =
+      record.material_name && record.material_name.trim() !== ""
+        ? record.material_name // ✅ ya viene con (ID: X) desde el backend
+        : `Material ID: ${record.material_id}`;
     return {
-      name: `${record.material_name || 'Material sin nombre'} (ID: ${record.material_id || '-'})`,
-      type: 'material',
+      name,
+      type: "material",
       id: record.material_id,
     };
   }
+
   if (record.product_id || record.product_name) {
+    const name =
+      record.product_name && record.product_name.trim() !== ""
+        ? record.product_name // ✅ mismo caso para productos
+        : `Producto ID: ${record.product_id}`;
     return {
-      name: `${record.product_name || 'Producto sin nombre'} (ID: ${record.product_id || '-'})`,
-      type: 'product',
+      name,
+      type: "product",
       id: record.product_id,
     };
   }
+
   return {
-    name: 'Ítem desconocido',
-    type: 'unknown',
-    id: record.id || '-',
+    name: "Ítem desconocido",
+    type: "unknown",
+    id: record.id || "-",
   };
 };
+
 
   const getMovementIcon = (movementType) => {
     switch (movementType?.toLowerCase()) {
