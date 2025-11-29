@@ -1,0 +1,47 @@
+version: "3.9"
+
+services:
+  backend:
+    build: ./backend
+    container_name: pyglass-backend
+    ports:
+      - "8000:8000"
+    environment:
+      MYSQL_ADDON_HOST: gu9zl0.h.filess.io
+      MYSQL_ADDON_DB: PYGLASS_jaroldarea
+      MYSQL_ADDON_USER: PYGLASS_jaroldarea
+      MYSQL_ADDON_PASSWORD: 201cd5b19447c7b56cff27dd60c200ed8e8470d0
+      MYSQL_ADDON_PORT: 61002
+    # Si quieres usar DB local, descomenta:
+    # depends_on:
+    #   - db
+
+  frontend:
+    build: ./frontend
+    container_name: pyglass-frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    environment:
+      # 🔗 URL del backend cuando corres con Docker en local
+      VITE_API_URL: "http://localhost:8000"
+
+# Contenedor de DB local opcional (solo si quieres usar MySQL localmente)
+# db:
+#   image: mysql:8.0
+#   container_name: pyglass-db
+#   restart: always
+#   environment:
+#     MYSQL_ROOT_PASSWORD: rootpass
+#     MYSQL_DATABASE: pyglass
+#     MYSQL_USER: pyglass_user
+#     MYSQL_PASSWORD: pyglass_pass
+#   ports:
+#     - "3307:3306"
+#   volumes:
+#     - db_data:/var/lib/mysql
+
+# Volumen persistente para DB local
+# volumes:
+#   db_data:
