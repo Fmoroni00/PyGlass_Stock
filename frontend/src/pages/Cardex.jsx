@@ -88,21 +88,32 @@ export default function Cardex() {
     setSearchTerm('');
   };
 
-  const formatDate = (dateString) => {
+const formatDate = (dateString) => {
+  if (!dateString) return "Sin fecha";
+  try {
     const date = new Date(dateString);
-    if (isNaN(date)) {
-      return "Fecha inválida";
-    }
-    return date.toLocaleString("es-PE", {
+    if (isNaN(date)) return "Fecha inválida";
+
+    // Convertir de UTC a hora local de Lima (-5)
+    const limaDate = new Date(date.getTime() - 5 * 60 * 60 * 1000);
+
+    const formatter = new Intl.DateTimeFormat("es-PE", {
       timeZone: "America/Lima",
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
       hour: "2-digit",
-      minute: "2-digit"
-
+      minute: "2-digit",
+      hour12: true,
     });
-  };
+
+    return formatter.format(limaDate);
+  } catch (err) {
+    console.error("Error al formatear fecha:", err);
+    return "Error de fecha";
+  }
+};
+
 
   const getItemDetails = (record) => {
     if (record.material_id || record.material_name) {
