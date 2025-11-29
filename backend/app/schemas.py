@@ -132,6 +132,10 @@ class KardexCreate(KardexBase):
 class KardexOut(KardexBase):
     id: int
     date: Optional[datetime] = None
+    username: Optional[str] = None
+    material_name: Optional[str] = None
+    product_name: Optional[str] = None
 
     class Config:
         orm_mode = True
+
