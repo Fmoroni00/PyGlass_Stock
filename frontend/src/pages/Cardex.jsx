@@ -116,26 +116,26 @@ const formatDate = (dateString) => {
 
 
   const getItemDetails = (record) => {
-    if (record.material_id || record.material_name) {
-      return {
-        name: record.material_name || `Material ID: ${record.material_id}`,
-        type: 'material',
-        id: record.material_id,
-      };
-    }
-    if (record.product_id || record.product_name) {
-      return {
-        name: record.product_name || `Producto ID: ${record.product_id}`,
-        type: 'product',
-        id: record.product_id,
-      };
-    }
+  if (record.material_id || record.material_name) {
     return {
-      name: 'Ítem Desconocido',
-      type: 'unknown',
-      id: record.id || '-',
+      name: `${record.material_name || 'Material sin nombre'} (ID: ${record.material_id || '-'})`,
+      type: 'material',
+      id: record.material_id,
     };
+  }
+  if (record.product_id || record.product_name) {
+    return {
+      name: `${record.product_name || 'Producto sin nombre'} (ID: ${record.product_id || '-'})`,
+      type: 'product',
+      id: record.product_id,
+    };
+  }
+  return {
+    name: 'Ítem desconocido',
+    type: 'unknown',
+    id: record.id || '-',
   };
+};
 
   const getMovementIcon = (movementType) => {
     switch (movementType?.toLowerCase()) {
