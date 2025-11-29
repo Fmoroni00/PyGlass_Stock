@@ -94,7 +94,7 @@ export default function Cardex() {
       return "Fecha inválida";
     }
     return date.toLocaleString("es-PE", {
-      timeZone: "América/Lima",
+      timeZone: "America/Lima",
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
