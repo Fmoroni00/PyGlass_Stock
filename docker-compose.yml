@@ -27,7 +27,7 @@ services:
       # 🔗 URL del backend cuando corres con Docker en local
       VITE_API_URL: "http://localhost:8000"
 
-# Contenedor de DB local opcional (solo si quieres usar MySQL localmente)
+# Contenedor de DB local opcional (para usar MySQL localmente)
 # db:
 #   image: mysql:8.0
 #   container_name: pyglass-db
