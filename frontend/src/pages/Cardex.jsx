@@ -88,45 +88,65 @@ export default function Cardex() {
     setSearchTerm('');
   };
 
-  const formatDate = (dateString) => {
+const formatDate = (dateString) => {
+  if (!dateString) return "Sin fecha";
+  try {
     const date = new Date(dateString);
-    if (isNaN(date)) {
-      return "Fecha inválida";
-    }
+    if (isNaN(date)) return "Fecha inválida";
 
-    // Usamos "es-PE" (Perú) y forzamos la zona horaria de Lima
-    return date.toLocaleString("es-PE", {
-      timeZone: "America/Lima",  // <-- Esta es la línea clave
+    // Convertir de UTC a hora local de Lima (-5)
+    const limaDate = new Date(date.getTime() - 5 * 60 * 60 * 1000);
+
+    const formatter = new Intl.DateTimeFormat("es-PE", {
+      timeZone: "America/Lima",
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
       hour: "2-digit",
-      minute: "2-digit"
-
+      minute: "2-digit",
+      hour12: true,
     });
-  };
 
-  const getItemDetails = (record) => {
-    if (record.material_id || record.material_name) {
-      return {
-        name: record.material_name || `Material ID: ${record.material_id}`,
-        type: 'material',
-        id: record.material_id,
-      };
-    }
-    if (record.product_id || record.product_name) {
-      return {
-        name: record.product_name || `Producto ID: ${record.product_id}`,
-        type: 'product',
-        id: record.product_id,
-      };
-    }
+    return formatter.format(limaDate);
+  } catch (err) {
+    console.error("Error al formatear fecha:", err);
+    return "Error de fecha";
+  }
+};
+
+
+const getItemDetails = (record) => {
+  if (record.material_id || record.material_name) {
+    const name =
+      record.material_name && record.material_name.trim() !== ""
+        ? record.material_name // ✅ ya viene con (ID: X) desde el backend
+        : `Material ID: ${record.material_id}`;
     return {
-      name: 'Ítem Desconocido',
-      type: 'unknown',
-      id: record.id || '-',
+      name,
+      type: "material",
+      id: record.material_id,
     };
+  }
+
+  if (record.product_id || record.product_name) {
+    const name =
+      record.product_name && record.product_name.trim() !== ""
+        ? record.product_name // ✅ mismo caso para productos
+        : `Producto ID: ${record.product_id}`;
+    return {
+      name,
+      type: "product",
+      id: record.product_id,
+    };
+  }
+
+  return {
+    name: "Ítem desconocido",
+    type: "unknown",
+    id: record.id || "-",
   };
+};
+
 
   const getMovementIcon = (movementType) => {
     switch (movementType?.toLowerCase()) {
@@ -414,14 +434,16 @@ export default function Cardex() {
                       <td className="align-middle">
                         <small>{formatDate(record.date)}</small>
                       </td>
-                      <td className="align-middle">
-                        <div className="d-flex align-items-center gap-2">
-                          <span className={`badge ${itemDetails.type === 'material' ? 'bg-primary' : 'bg-success'} bg-opacity-25 text-${itemDetails.type === 'material' ? 'primary' : 'success'}`}>
-                            {itemDetails.type === 'material' ? 'M' : 'P'}
-                          </span>
-                          <span className="fw-semibold">{itemDetails.name}</span>
-                        </div>
-                      </td>
+                        <td className="align-middle">
+                          <div className="d-flex align-items-center gap-2">
+                            <span className={`badge ${itemDetails.type === 'material' ? 'bg-primary' : 'bg-success'} bg-opacity-25 text-${itemDetails.type === 'material' ? 'primary' : 'success'}`}>
+                              {itemDetails.type === 'material' ? 'M' : 'P'}
+                            </span>
+                            <span className="fw-semibold">
+                              {itemDetails.name} (ID: {itemDetails.id})
+                            </span>
+                          </div>
+                        </td>
                       <td className="align-middle">
                         <span className={`badge ${movementBadgeClass}`}>
                           {getMovementIcon(record.movement_type)} {getMovementLabel(record.movement_type)}
