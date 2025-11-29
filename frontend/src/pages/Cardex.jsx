@@ -102,7 +102,7 @@ const formatDate = (dateString) => {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
-      hour:a "2-digit",
+      hour: "2-digit",
       minute: "2-digit",
       hour12: true,
     });
