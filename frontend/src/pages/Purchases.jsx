@@ -9,6 +9,7 @@ const INITIAL_SUPPLIER_STATE = {
   address: "",
   material_id: null, // Se llenará automáticamente
 };
+
 export default function Purchases() {
   const [materials, setMaterials] = useState([]);
   const [showAddSupplierModal, setShowAddSupplierModal] = useState(false);

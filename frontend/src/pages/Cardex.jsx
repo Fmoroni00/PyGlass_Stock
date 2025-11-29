@@ -102,7 +102,7 @@ const formatDate = (dateString) => {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
-      hour: "2-digit",
+      hour:a "2-digit",
       minute: "2-digit",
       hour12: true,
     });
@@ -423,14 +423,16 @@ const formatDate = (dateString) => {
                       <td className="align-middle">
                         <small>{formatDate(record.date)}</small>
                       </td>
-                      <td className="align-middle">
-                        <div className="d-flex align-items-center gap-2">
-                          <span className={`badge ${itemDetails.type === 'material' ? 'bg-primary' : 'bg-success'} bg-opacity-25 text-${itemDetails.type === 'material' ? 'primary' : 'success'}`}>
-                            {itemDetails.type === 'material' ? 'M' : 'P'}
-                          </span>
-                          <span className="fw-semibold">{itemDetails.name}</span>
-                        </div>
-                      </td>
+                        <td className="align-middle">
+                          <div className="d-flex align-items-center gap-2">
+                            <span className={`badge ${itemDetails.type === 'material' ? 'bg-primary' : 'bg-success'} bg-opacity-25 text-${itemDetails.type === 'material' ? 'primary' : 'success'}`}>
+                              {itemDetails.type === 'material' ? 'M' : 'P'}
+                            </span>
+                            <span className="fw-semibold">
+                              {itemDetails.name} (ID: {itemDetails.id})
+                            </span>
+                          </div>
+                        </td>
                       <td className="align-middle">
                         <span className={`badge ${movementBadgeClass}`}>
                           {getMovementIcon(record.movement_type)} {getMovementLabel(record.movement_type)}
